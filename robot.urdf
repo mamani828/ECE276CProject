@@ -1,0 +1,121 @@
+<robot name="three_link_robot">
+		
+	<material name="black">
+		<color rgba="0 0 0 0.7"/>
+	</material>
+	<material name="white">
+		<color rgba="1 1 1 0.7"/>
+	</material>
+
+	<link name="base"/>
+
+	<link name="arm1">
+		<visual>
+			<origin rpy="0 0 0" xyz="0 0 0.1" />
+	        <geometry>
+	          <cylinder radius="0.02" length="0.15" />
+	        </geometry>
+			<material name="black"/>
+		</visual>
+		<!-- <collision>
+			<origin rpy="0 0 0" xyz="0 0 0.1" />
+			<geometry>
+				<box size="0.05 0.05 0.15" />
+			</geometry>
+		</collision> -->
+	</link>
+
+	<joint name="baseHinge" type="revolute">
+		<axis rpy="0 0 0" xyz="0 0 1"/>
+		<parent link="base"/>
+		<child link="arm1"/>
+		<limit lower="-1000" upper="1000" effort="2000" velocity="1000"/>
+        <dynamics damping="0" friction="0"/>
+	</joint>
+
+    <link name="arm2">
+        <visual>
+            <origin rpy="0 -1.57 0" xyz="0.25 0 0" />
+            <geometry>
+            <cylinder radius="0.02" length="0.45" />
+            </geometry>
+            <material name="white" />
+        </visual>
+
+        <collision>
+            <origin rpy="0 -1.57 0" xyz="0.25 0 0" />
+            <geometry>
+            <cylinder radius="0.02" length="0.45" />
+            </geometry>
+        </collision>
+    </link>
+
+
+
+
+    
+	<joint name="interArm" type="revolute">
+		<axis rpy="0 0 0" xyz="0 0 1"/>
+		<parent link="arm1"/>
+		<child link="arm2"/>
+		<origin rpy="1.57 0 0" xyz="0 0 0.2"/>
+		<limit lower="-1000" upper="1000" effort="2000" velocity="1000"/>
+        <dynamics damping="0" friction="0" />
+	</joint>
+
+
+    <link name="arm3">
+        <visual>
+            <origin rpy="0 1.57 0" xyz="0.25 0 0" />
+            <geometry>
+            <cylinder radius="0.02" length="0.45" />
+            </geometry>
+            <material name="white" />
+        </visual>
+
+        <collision>
+            <origin rpy="0 1.57 0" xyz="0.25 0 0" />
+            <geometry>
+            <cylinder radius="0.02" length="0.45" />
+            </geometry>
+        </collision>
+    </link>
+
+
+	<joint name="interArm2" type="revolute">
+		<axis rpy="0 0 0" xyz="0 0 1"/>
+		<parent link="arm2"/>
+		<child link="arm3"/>
+		<origin rpy="0 0 0" xyz="0.5 0 0"/>
+		<limit lower="-1000" upper="1000" effort="2000" velocity="1000"/>
+        <dynamics damping="0" friction="0" />
+	</joint>
+<link name="ee_link">
+  <visual>
+    <!-- optional, can be a small sphere or box just so you see it -->
+    <origin rpy="0 0 0" xyz="0 0 0" />
+    <geometry>
+      <sphere radius="0.02" />
+    </geometry>
+    <material name="white"/>
+  </visual>
+  <!-- collision optional; you can omit or make it tiny -->
+  <collision>
+    <origin rpy="0 0 0" xyz="0 0 0" />
+    <geometry>
+      <sphere radius="0.02" />
+    </geometry>
+  </collision>
+</link>
+
+<joint name="ee_joint" type="fixed">
+  <parent link="arm3"/>
+  <child link="ee_link"/>
+
+  <!-- Set this origin to be at the arm3 tip in arm3's frame -->
+  <!-- Example: if arm3's x axis points along the link and its tip is at x=0.5 -->
+  <origin rpy="0 0 0" xyz="0.5 0 0"/>
+
+  <!-- no limits for fixed joint -->
+</joint>
+</robot>
