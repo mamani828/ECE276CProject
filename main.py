@@ -243,8 +243,8 @@ if __name__ == "__main__":
         )
 
     # Add Collision Objects
-    #collision_ids = [ground_id] # add the ground to the collision list
-    collision_ids = []
+    collision_ids = [ground_id] # add the ground to the collision list
+    #collision_ids = []
     collision_positions = [[0.3, 0.5, 0.251], [-0.3, 0.3, 0.101], [-1, -0.15, 0.251], [-1, -0.15, 0.752], [-0.5, -1, 0.251], [0.5, -0.35, 0.201], [0.5, -0.35, 0.602]]
     collision_orientations =  [[0, 0, 0.5], [0, 0, 0.2], [0, 0, 0],[0, 0, 1], [0, 0, 0], [0, 0, .25], [0, 0, 0.5]]
     collision_scales = [0.5, 0.25, 0.5, 0.5, 0.5, 0.4, 0.4]
