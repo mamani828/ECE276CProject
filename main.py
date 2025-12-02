@@ -4,7 +4,7 @@ import time
 from useful_code import *
 import random
 from matplotlib import pyplot as plt   
-
+from sdf import make_pybullet_env_sdf, visualize_sdf_slice
 
 def check_node_collision(robot_id, object_ids, joint_position):
     """
@@ -243,7 +243,8 @@ if __name__ == "__main__":
         )
 
     # Add Collision Objects
-    collision_ids = [ground_id] # add the ground to the collision list
+    #collision_ids = [ground_id] # add the ground to the collision list
+    collision_ids = []
     collision_positions = [[0.3, 0.5, 0.251], [-0.3, 0.3, 0.101], [-1, -0.15, 0.251], [-1, -0.15, 0.752], [-0.5, -1, 0.251], [0.5, -0.35, 0.201], [0.5, -0.35, 0.602]]
     collision_orientations =  [[0, 0, 0.5], [0, 0, 0.2], [0, 0, 0],[0, 0, 1], [0, 0, 0], [0, 0, .25], [0, 0, 0.5]]
     collision_scales = [0.5, 0.25, 0.5, 0.5, 0.5, 0.4, 0.4]
@@ -276,8 +277,19 @@ if __name__ == "__main__":
     # Set the initial joint positions
     for joint_index, joint_pos in enumerate(goal_positions[0]):
         p.resetJointState(arm_id, joint_index, joint_pos)
-
+    make_pybullet_env_sdf(collision_ids, max_distance=5.5, probe_radius=0.01)
+    visualize_sdf_slice(
+        env_sdf=make_pybullet_env_sdf(collision_ids, max_distance=5.5, probe_radius=0.01),
+        height=0.2,
+        x_range=(-3.0, 3.0),
+        y_range=(-3.0, 3.0),
+        resolution=0.1,
+        cmap='seismic',
+        vmin=-1.0,
+        vmax=1.0
+    )
     visualize_spherical_robot(arm_id, goal_positions[0], ROBOT_SPHERES, color=[1, 0, 0, 0.4])
+    
     # Move through the waypoints
     for waypoint in path_saved:
         # "move" to next waypoints
