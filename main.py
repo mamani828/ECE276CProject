@@ -1,99 +1,12 @@
 import pybullet as p
 import pybullet_data
 import time
+from rrt import RRT
 from useful_code import *
 import random
 from matplotlib import pyplot as plt   
 from sdf import make_pybullet_env_sdf, visualize_sdf_slice
 
-def check_node_collision(robot_id, object_ids, joint_position):
-    """
-    Checks for collisions between a robot and an object in PyBullet. 
-
-    Args:
-        robot_id (int): The ID of the robot in PyBullet.
-        object_id (int): The ID of the object in PyBullet.
-        joint_position (list): List of joint positions. 
-
-    Returns:
-        bool: True if a collision is detected, False otherwise.
-    """
-    # set joint positions
-    for joint_index, joint_pos in enumerate(joint_position):
-        p.resetJointState(robot_id, joint_index, joint_pos)
-
-    # Perform collision check for all links
-    for object_id in object_ids:    # Check for each object
-        for link_index in range(0, p.getNumJoints(robot_id)): # Check for each link of the robot
-            contact_points = p.getClosestPoints(
-                bodyA=robot_id, bodyB=object_id, distance=0.01, linkIndexA=link_index
-            )
-            if contact_points:  # If any contact points exist, a collision is detected
-                return True # exit early
-    return False
-
-#################################################
-#### YOUR CODE HERE: COLLISION EDGE CHECKING ####
-#################################################
-def check_edge_collision(robot_id, object_ids, joint_position_start, joint_position_end, discretization_step=0.01):
-    """ 
-    Checks for collision between two joint positions of a robot in PyBullet.
-    Args:
-        robot_id (int): The ID of the robot in PyBullet.
-        object_ids (list): List of IDs of the objects in PyBullet.
-        joint_position_start (list): List of joint positions to start from.
-        joint_position_end (list): List of joint positions to get to.
-        discretization_step (float): maximum interpolation distance before a new collision check is performed.
-    Returns:
-        bool: True if a collision is detected, False otherwise.
-    """
-    pass
-
-    
-# Provided 
-class Node:
-    def __init__(self, joint_angles):
-        self.joint_angles = np.array(joint_angles)  # joint angles of the node in n-dimensional space
-        self.parent = None
-
-######################################################################
-##################### YOUR CODE HERE: RRT CLASS ######################
-######################################################################
-class RRT:
-    def __init__(self, q_start, q_goal, robot_id, obstacle_ids, q_limits, max_iter=10000, step_size=0.5):
-        """
-        RRT Initialization.
-
-        Parameters:
-        - q_start: List of starting joint angles [x1, x2, ..., xn].
-        - q_goal: List of goal joint angles [x1, x2, ..., xn].
-        - obstacle_ids: List of obstacles, each as a tuple ([center1, center2, ..., centern], radius).
-        - q_limits: List of tuples [(min_x1, max_x1), ..., (min_xn, max_xn)] representing the limits in each dimension.
-        - max_iter: Maximum number of iterations.
-        - step_size: Maximum step size to expand the tree.
-        """
-        self.q_start = Node(q_start)
-        self.q_goal = Node(q_goal)
-        self.obstacle_ids = obstacle_ids
-        self.robot_id = robot_id
-        self.q_limits = q_limits
-        self.max_iter = max_iter
-        self.step_size = step_size
-        self.node_list = [self.q_start]
-
-    def step(self, from_node, to_joint_angles):
-        """Step from "from_node" to "to_joint_angles", that should
-         (a) return the to_joint_angles if it is within the self.step_size or
-         (b) only step so far as self.step_size, returning the new node within that distance"""
-        pass
-
-    def get_nearest_node(self, random_point):
-        """Find the nearest node in the tree to a given point."""
-        pass
-
-    def plan(self):
-        """Run the RRT algorithm to find a path of dimension Nx3. Limit the search to only max_iter iterations."""
-        pass
 
 
 #####################################################
@@ -238,7 +151,7 @@ if __name__ == "__main__":
             link_index=link_idx,
             radius=0.08,
             q_ref=q_ref,
-            max_spacing_factor=1.5,  # tune overlap
+            max_spacing_factor=1.0,  # tune overlap
             min_spheres=2            # at least 2 spheres per link
         )
 
@@ -285,12 +198,36 @@ if __name__ == "__main__":
         y_range=(-3.0, 3.0),
         resolution=0.1,
         cmap='seismic',
-        vmin=-1.0,
-        vmax=1.0
+        vmin=-5.5,
+        vmax=5.5
     )
+    from rrt_cbf import RRT_CBF
+    from rrt import RRT
     visualize_spherical_robot(arm_id, goal_positions[0], ROBOT_SPHERES, color=[1, 0, 0, 0.4])
-    
-    # Move through the waypoints
+    for i in range(len(goal_positions)-1):
+        q_start = goal_positions[i]
+        q_goal = goal_positions[i+1]
+
+        rrt_planner = RRT_CBF(q_start, q_goal, arm_id, collision_ids, joint_limits,
+                            make_pybullet_env_sdf(collision_ids, max_distance=5.5, probe_radius=0.01),
+                            ROBOT_SPHERES,
+                            joint_indices=[0,1,2],
+                            max_iter=5000,
+                            step_size=0.15,
+                            alpha=10.0,
+                            d_safe=0.001)
+        path_segment = rrt_planner.plan() #change to plan2() for RRT*, it runs at max iteration so it will take a bit but will give great paths
+        # rrt_planner = RRT(q_start, q_goal, arm_id, collision_ids, joint_limits,
+        #                     max_iter=5000,
+        #                     step_size=0.5)
+        # path_segment = rrt_planner.plan()
+
+        if path_segment is None:
+            print(f"RRT failed to find a path from {q_start} to {q_goal}")
+        else:
+            print(f"RRT found a path from {q_start} to {q_goal} with {len(path_segment)} waypoints")
+            path_saved = np.vstack((path_saved, path_segment[1:]))
+# Move through the waypoints
     for waypoint in path_saved:
         # "move" to next waypoints
         for joint_index, joint_pos in enumerate(waypoint):
