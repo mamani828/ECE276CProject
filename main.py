@@ -184,7 +184,7 @@ if __name__ == "__main__":
         [0, 0, 0.5],
     ]
     collision_scales = [0.5, 0.25, 0.5, 0.5, 0.5, 0.4, 0.4]
-    
+
     # Having colorful cubes
     colors = [
     [1, 0, 0, 1],   # red
@@ -227,18 +227,9 @@ if __name__ == "__main__":
     for joint_index, joint_pos in enumerate(goal_positions[0]):
         p.resetJointState(arm_id, joint_index, joint_pos)
     sdf_env = make_pybullet_env_sdf(collision_ids, max_distance=5.5, probe_radius=0.01)
-    visualize_sdf_slice(
-        env_sdf=make_pybullet_env_sdf(
-            collision_ids, max_distance=5.5, probe_radius=0.01
-        ),
-        height=0.2,
-        x_range=(-3.0, 3.0),
-        y_range=(-3.0, 3.0),
-        resolution=0.1,
-        cmap="seismic",
-        vmin=-5.5,
-        vmax=5.5,
-    )
+    
+    for height in [0.2, 0.4, 0.6, 0.8, 1.0]:
+        visualize_sdf_slice(sdf_env, height=height)
 
     visualize_spherical_robot(
         arm_id, goal_positions[0], ROBOT_SPHERES, color=[1, 0, 0, 0.4]
@@ -282,10 +273,12 @@ if __name__ == "__main__":
         for joint_index, joint_pos in enumerate(waypoint):
             # run velocity control until waypoint is reached
             while True:
-                # get current joint positions
-                goal_positions = [p.getJointState(arm_id, i)[0] for i in range(3)]
-                # calculate the displacement to reach the next waypoint
-                displacement_to_waypoint = waypoint - goal_positions
+                # get current joint positions (ground truth)
+                true_joint_positions = np.array([p.getJointState(arm_id, i)[0] for i in range(3)])
+                
+                # calculate the displacement to reach the next waypoint using MEASURED positions
+                displacement_to_waypoint = waypoint - true_joint_positions
+                
                 # check if goal is reached
                 max_speed = 0.05
                 if np.linalg.norm(displacement_to_waypoint) < max_speed:
@@ -296,21 +289,22 @@ if __name__ == "__main__":
                         np.min((np.linalg.norm(displacement_to_waypoint), max_speed))
                         * displacement_to_waypoint
                         / np.linalg.norm(displacement_to_waypoint)
-                    )
-                    for joint_index, joint_step in enumerate(velocities):
+                    )                    
+
+                    for joint_index, velocity in enumerate(velocities):
                         p.setJointMotorControl2(
                             bodyIndex=arm_id,
                             jointIndex=joint_index,
                             controlMode=p.VELOCITY_CONTROL,
-                            targetVelocity=joint_step,
+                            targetVelocity=velocity,
                         )
-
+                # Visualize the robot at the current waypoint
+                visualize_spherical_robot(
+                    arm_id, waypoint, ROBOT_SPHERES, color=[1, 0, 0, 0.4]
+                )
                 # Take a simulation step
                 p.stepSimulation()
         time.sleep(1.0 / 240.0)
 
     # Disconnect from PyBullet
-    time.sleep(
-        100
-    )  # Remove this line -- it is just to keep the GUI open when you first run this starter code
     p.disconnect()

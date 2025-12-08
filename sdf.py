@@ -8,11 +8,12 @@ def make_pybullet_env_sdf(obstacle_ids, max_distance=5.0, probe_radius=1e-3):
     Returns env_sdf(point) that gives signed distance to the closest collider
     among `obstacle_ids`, using PyBullet getClosestPoints.
 
-    point: (x, y, z)
-    output:
-        d < 0 : point is inside some obstacle (penetration depth)
-        d = 0 : on the surface
-        d > 0 : outside, distance to nearest surface (approximate, capped at max_distance)
+    Args:
+        obstacle_ids (list): List of obstacle IDs in PyBullet.
+        max_distance (float): The maximum distance to search for obstacles.
+        probe_radius (float): The radius of the probe sphere.
+    Returns:
+        function: The SDF function that gives the signed distance to the closest obstacle.
     """
 
     # Create a tiny probe sphere we will move around for queries
@@ -25,7 +26,13 @@ def make_pybullet_env_sdf(obstacle_ids, max_distance=5.0, probe_radius=1e-3):
     )
 
     def env_sdf(point):
-        # Ensure point is a plain list/tuple
+        """
+        Ensure point is a plain list/tuple and move probe to query point.
+        Args:
+            point (list/tuple): The point to query the SDF at.
+        Returns:
+            float: The signed distance to the closest obstacle.
+        """
         point = list(point)
 
         # Move probe to query point
@@ -78,6 +85,17 @@ def visualize_sdf_slice(
 ):
     """
     Visualizes a 2D slice of the SDF at a given height (z value).
+    Args:
+        env_sdf (function): The SDF function.
+        height (float): The height of the slice.
+        x_range (tuple): The range of x values.
+        y_range (tuple): The range of y values.
+        resolution (float): The resolution of the slice.
+        cmap (str): The colormap to use.
+        vmin (float): The minimum value of the colormap.
+        vmax (float): The maximum value of the colormap.
+    Returns:
+        None.
     """
 
     import matplotlib.pyplot as plt

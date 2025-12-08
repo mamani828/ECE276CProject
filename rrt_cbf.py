@@ -37,11 +37,11 @@ class RRT_CBF:
         self.robot_id = robot_id
         self.obstacle_ids = obstacle_ids
         self.q_limits = np.array(q_limits, dtype=float)
-        self.env_sdf = env_sdf  # <- your SDF from make_pybullet_env_sdf
+        self.env_sdf = env_sdf  # SDF function
         self.spheres = spheres  # list of dicts: {"link_index", "local_pos"}
         self.joint_indices = joint_indices  # PyBullet joint indices for q
-        self.dt = 0.05  # or similar
-        self.u_max = 1.0  # max joint speed
+        self.dt = 0.05  # time step
+        self.u_max = 1.0  # max joint velocity
         self.max_iter = max_iter
         self.step_size = float(step_size)
         self.alpha = float(alpha)
@@ -52,7 +52,7 @@ class RRT_CBF:
         self.q_start.cost = 0.0
         self.ee_link_index = 2
 
-    # ---------- helpers to sync q with PyBullet ----------
+    # Helpers to sync q with PyBullet
 
     def _set_robot_config(self, q):
         """Reset PyBullet joint states to configuration q."""
@@ -61,7 +61,7 @@ class RRT_CBF:
             p.resetJointState(self.robot_id, j_idx, q[i])
 
     def _sphere_world_pos(self, link_index, local_pos):
-        """World position of a sphere attached to a link at `local_pos`."""
+        """World position of a sphere attached to a link at local_pos."""
         link_state = p.getLinkState(
             self.robot_id, link_index, computeForwardKinematics=True
         )
@@ -74,7 +74,7 @@ class RRT_CBF:
 
     def _sphere_jacobian(self, link_index, local_pos, q):
         """
-        3 x n linear Jacobian for a sphere point in world coordinates.
+        3 x n linear Jacobian for a sphere point in world frame.
         """
         q = np.asarray(q, dtype=float)
         # velocities are not used for Jacobian
@@ -84,11 +84,11 @@ class RRT_CBF:
         )
         return np.array(J_pos)  # shape (3, n)
 
-    # SDF gradient in workspace
+    # SDF gradient in world frame
 
     def _sdf_grad_world(self, x, eps=1e-3):
         """
-        Finite-difference gradient of SDF at world point x (3,).
+        Finite-difference gradient of SDF at world point x (3,).epsilon = 1e-3 for numerical stability (avoid division by zero) to compute the gradient.
         """
         x = np.asarray(x, dtype=float)
         grad = np.zeros(3)
@@ -102,11 +102,11 @@ class RRT_CBF:
 
     def sdf_and_grad(self, q):
         """
-        Compute CBF values h_i(q) = d_i(q) - d_safe and their gradients dh_i/dq.
+        Compute CBF values h_i(q) = d_i(q) - d_safe and their gradients dh_i/dq for all spheres.
 
         Returns:
         - h:  (m,) barrier values (one per sphere)
-        - dh: (m, n) Jacobian of h wrt q
+        - dh: (m, n) Jacobian of h wrt q for all spheres (m = number of spheres, n = number of joints)
         """
         q = np.asarray(q, dtype=float)
         self._set_robot_config(q)
@@ -142,6 +142,9 @@ class RRT_CBF:
         return h, dh
 
     def _project_onto_cbf_constraints(self, u_des, h, dh, max_iters=10):
+        """
+        Project the desired velocity u_des onto the CBF constraints for all spheres.
+        """
         u = u_des.copy()
         m = h.shape[0]
         for _ in range(max_iters):
@@ -160,6 +163,11 @@ class RRT_CBF:
         return u
 
     def step(self, q_from, q_to, num_substeps=5):
+        """
+        Step from q_from to q_to, that should
+        (a) return the q_to if it is within the self.step_size or
+        (b) only step so far as self.step_size, returning the new node within that distance
+        """
         q = np.asarray(q_from, dtype=float)
         q_to = np.asarray(q_to, dtype=float)
 
@@ -185,9 +193,8 @@ class RRT_CBF:
 
     def plan(self):
         """
-        Basic RRT with CBF-constrained steering (self.step) instead of
-        discrete collision checking. Returns an NxD array of joint configs
-        from start to goal, or None if no path is found.
+        Basic RRT with CBF-constrained steering (self.step) instead of discrete collision checking.
+        Returns an NxD array of joint configs from start to goal, or None if no path is found.
         """
         for _ in range(self.max_iter):
             # Sample goal with some probability, otherwise sample uniformly
