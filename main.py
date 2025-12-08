@@ -213,9 +213,9 @@ if __name__ == "__main__":
                             ROBOT_SPHERES,
                             joint_indices=[0,1,2],
                             max_iter=5000,
-                            step_size=0.05,
+                            step_size=0.5,
                             alpha=10.0,
-                            d_safe=0.15)
+                            d_safe=0.05)
         path_segment = rrt_planner.plan() #change to plan2() for RRT*, it runs at max iteration so it will take a bit but will give great paths
         # rrt_planner = RRT(q_start, q_goal, arm_id, collision_ids, joint_limits,
         #                     max_iter=5000,

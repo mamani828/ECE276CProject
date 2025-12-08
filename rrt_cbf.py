@@ -32,7 +32,8 @@ class RRT_CBF:
         self.env_sdf = env_sdf          # <- your SDF from make_pybullet_env_sdf
         self.spheres = spheres          # list of dicts: {"link_index", "local_pos"}
         self.joint_indices = joint_indices  # PyBullet joint indices for q
-
+        self.dt = 0.05      # or similar
+        self.u_max = 1.0    # max joint speed
         self.max_iter = max_iter
         self.step_size = float(step_size)
         self.alpha = float(alpha)
@@ -158,37 +159,32 @@ class RRT_CBF:
             if not changed:
                 break
         return u
-    def step(self, q_from, q_to):
-        """
-        CBF-constrained steer:
-        - desired: move from q_from towards q_to by at most step_size
-        - enforce h_i(q) staying safe via CBF constraints in joint increment.
-        """
-        q_from = np.asarray(q_from, dtype=float)
-        q_to   = np.asarray(q_to,   dtype=float)
 
-        delta = q_to - q_from
-        L = np.linalg.norm(delta)
-        if L < 1e-9:
-            return q_from.copy()
 
-        if L > self.step_size:
-            delta = delta * (self.step_size / L)
+    def step(self, q_from, q_to, num_substeps=5):
+        q = np.asarray(q_from, dtype=float)
+        q_to = np.asarray(q_to, dtype=float)
 
-        u_des = delta
+        for _ in range(num_substeps):
+            direction = q_to - q
+            L = np.linalg.norm(direction)
+            if L < 1e-3:
+                break
 
-        # barrier values and gradients at q_from
-        h, dh = self.sdf_and_grad(q_from)
+            direction /= L
+            u_des = self.u_max * direction
 
-        u_safe = self._project_onto_cbf_constraints(u_des, h, dh)
+            h, dh = self.sdf_and_grad(q)
+            u_safe = self._project_onto_cbf_constraints(u_des, h, dh)
 
-        # if projection fails (tiny movement), you effectively stop
-        if np.linalg.norm(u_safe) < 1e-6:
-            return q_from.copy()
+            if np.linalg.norm(u_safe) < 1e-6:
+                break
 
-        q_new = q_from + u_safe
-        q_new = np.clip(q_new, self.q_limits[:, 0], self.q_limits[:, 1])
-        return q_new
+            q = q + u_safe * self.dt
+            q = np.clip(q, self.q_limits[:, 0], self.q_limits[:, 1])
+
+        return q
+
 
     def plan(self):
         """
@@ -198,7 +194,7 @@ class RRT_CBF:
         """
         for _ in range(self.max_iter):
             # Sample goal with some probability, otherwise sample uniformly
-            if np.random.rand() < 0.10:
+            if np.random.rand() < 0.20:
                 q_rand = self.q_goal.joint_angles.copy()
             else:
                 q_rand = np.array(
@@ -236,7 +232,7 @@ class RRT_CBF:
                 q_goal_proj = self.step(new_node.joint_angles, self.q_goal.joint_angles)
 
                 # If CBF allows us to reach (or nearly reach) the goal config
-                if np.linalg.norm(q_goal_proj - self.q_goal.joint_angles) < 1e-3:
+                if np.linalg.norm(q_goal_proj - self.q_goal.joint_angles) < self.step_size:
                     self.q_goal.parent = new_node
 
                     # Build path and return immediately
