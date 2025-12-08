@@ -184,17 +184,28 @@ if __name__ == "__main__":
         [0, 0, 0.5],
     ]
     collision_scales = [0.5, 0.25, 0.5, 0.5, 0.5, 0.4, 0.4]
+    
+    # Having colorful cubes
+    colors = [
+    [1, 0, 0, 1],   # red
+    [0, 1, 0, 1],   # green
+    [0, 0, 1, 1],   # blue
+    [1, 1, 0, 1],   # yellow
+    [1, 0, 1, 1],   # magenta
+    [0, 1, 1, 1],   # cyan
+    [0.8, 0.4, 0, 1], # orange
+    ]
+
     for i in range(len(collision_scales)):
-        collision_ids.append(
-            p.loadURDF(
-                "cube.urdf",
-                basePosition=collision_positions[i],  # Position of the cube
-                baseOrientation=p.getQuaternionFromEuler(
-                    collision_orientations[i]
-                ),  # Orientation of the cube
-                globalScaling=collision_scales[i],  # Scale the cube to half size
-            )
+        uid = p.loadURDF(
+            "cube.urdf",
+            basePosition=collision_positions[i],
+            baseOrientation=p.getQuaternionFromEuler(collision_orientations[i]),
+            globalScaling=collision_scales[i]
         )
+        
+        p.changeVisualShape(uid, -1, rgbaColor=colors[i])
+        collision_ids.append(uid)
 
     # Goal Joint Positions for the Robot
     goal_positions = [
