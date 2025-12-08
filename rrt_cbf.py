@@ -1,12 +1,20 @@
 import pybullet as p
 import numpy as np
-from utils import plot_path,check_edge_collision, get_ee_position, plot_link_coordinate_frames, plot_rrt_edge
+from utils import (
+    plot_path,
+    check_edge_collision,
+    get_ee_position,
+    plot_link_coordinate_frames,
+    plot_rrt_edge,
+)
+
 
 class Node:
     def __init__(self, joint_angles):
         self.joint_angles = np.array(joint_angles)
         self.parent = None
         self.cost = 0.0
+
 
 class RRT_CBF:
     def __init__(
@@ -29,11 +37,11 @@ class RRT_CBF:
         self.robot_id = robot_id
         self.obstacle_ids = obstacle_ids
         self.q_limits = np.array(q_limits, dtype=float)
-        self.env_sdf = env_sdf          # <- your SDF from make_pybullet_env_sdf
-        self.spheres = spheres          # list of dicts: {"link_index", "local_pos"}
+        self.env_sdf = env_sdf  # <- your SDF from make_pybullet_env_sdf
+        self.spheres = spheres  # list of dicts: {"link_index", "local_pos"}
         self.joint_indices = joint_indices  # PyBullet joint indices for q
-        self.dt = 0.05      # or similar
-        self.u_max = 1.0    # max joint speed
+        self.dt = 0.05  # or similar
+        self.u_max = 1.0  # max joint speed
         self.max_iter = max_iter
         self.step_size = float(step_size)
         self.alpha = float(alpha)
@@ -55,17 +63,12 @@ class RRT_CBF:
     def _sphere_world_pos(self, link_index, local_pos):
         """World position of a sphere attached to a link at `local_pos`."""
         link_state = p.getLinkState(
-            self.robot_id,
-            link_index,
-            computeForwardKinematics=True
+            self.robot_id, link_index, computeForwardKinematics=True
         )
         link_pos = link_state[4]
         link_orn = link_state[5]
         world_pos, _ = p.multiplyTransforms(
-            link_pos,
-            link_orn,
-            local_pos,
-            [0.0, 0.0, 0.0, 1.0]
+            link_pos, link_orn, local_pos, [0.0, 0.0, 0.0, 1.0]
         )
         return np.array(world_pos)
 
@@ -77,16 +80,11 @@ class RRT_CBF:
         # velocities are not used for Jacobian
         zeros = [0.0] * len(q)
         J_pos, J_orn = p.calculateJacobian(
-            self.robot_id,
-            link_index,
-            local_pos,
-            q.tolist(),
-            zeros,
-            zeros
+            self.robot_id, link_index, local_pos, q.tolist(), zeros, zeros
         )
         return np.array(J_pos)  # shape (3, n)
 
-    # ---------- SDF gradient in workspace ----------
+    # SDF gradient in workspace
 
     def _sdf_grad_world(self, x, eps=1e-3):
         """
@@ -100,7 +98,7 @@ class RRT_CBF:
             grad[i] = (self.env_sdf(x + e) - self.env_sdf(x - e)) / (2.0 * eps)
         return grad
 
-    # ---------- h(q) and ∂h/∂q for all spheres ----------
+    # h(q) and dh/dq for all spheres
 
     def sdf_and_grad(self, q):
         """
@@ -139,9 +137,10 @@ class RRT_CBF:
             h_list.append(h_i)
             dh_list.append(dh_i)
 
-        h = np.array(h_list)              # (m,)
-        dh = np.vstack(dh_list)           # (m, n)
+        h = np.array(h_list)  # (m,)
+        dh = np.vstack(dh_list)  # (m, n)
         return h, dh
+
     def _project_onto_cbf_constraints(self, u_des, h, dh, max_iters=10):
         u = u_des.copy()
         m = h.shape[0]
@@ -159,7 +158,6 @@ class RRT_CBF:
             if not changed:
                 break
         return u
-
 
     def step(self, q_from, q_to, num_substeps=5):
         q = np.asarray(q_from, dtype=float)
@@ -185,7 +183,6 @@ class RRT_CBF:
 
         return q
 
-
     def plan(self):
         """
         Basic RRT with CBF-constrained steering (self.step) instead of
@@ -199,7 +196,7 @@ class RRT_CBF:
             else:
                 q_rand = np.array(
                     [np.random.uniform(lo, hi) for (lo, hi) in self.q_limits],
-                    dtype=float
+                    dtype=float,
                 )
 
             # Nearest node in joint space
@@ -223,16 +220,22 @@ class RRT_CBF:
                 ee_link_index=self.ee_link_index,
                 line_color=[0, 1, 0],
                 line_width=1,
-                duration=0
+                duration=0,
             )
 
             # Try to connect to goal if close enough
-            if np.linalg.norm(new_node.joint_angles - self.q_goal.joint_angles) <= self.step_size:
+            if (
+                np.linalg.norm(new_node.joint_angles - self.q_goal.joint_angles)
+                <= self.step_size
+            ):
                 # One last CBF step toward exact goal
                 q_goal_proj = self.step(new_node.joint_angles, self.q_goal.joint_angles)
 
                 # If CBF allows us to reach (or nearly reach) the goal config
-                if np.linalg.norm(q_goal_proj - self.q_goal.joint_angles) < self.step_size:
+                if (
+                    np.linalg.norm(q_goal_proj - self.q_goal.joint_angles)
+                    < self.step_size
+                ):
                     self.q_goal.parent = new_node
 
                     # Build path and return immediately
@@ -249,9 +252,6 @@ class RRT_CBF:
 
     def get_nearest_node(self, q_rand):
         """Find the nearest node in the tree to q_rand."""
-        dists = [
-            np.linalg.norm(node.joint_angles - q_rand)
-            for node in self.node_list
-        ]
+        dists = [np.linalg.norm(node.joint_angles - q_rand) for node in self.node_list]
         nearest_index = np.argmin(dists)
         return self.node_list[nearest_index]

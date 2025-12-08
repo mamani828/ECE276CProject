@@ -1,11 +1,9 @@
 import pybullet as p
 import numpy as np
 from matplotlib import pyplot as plt
-def make_pybullet_env_sdf(
-    obstacle_ids,
-    max_distance=5.0,
-    probe_radius=1e-3
-):
+
+
+def make_pybullet_env_sdf(obstacle_ids, max_distance=5.0, probe_radius=1e-3):
     """
     Returns env_sdf(point) that gives signed distance to the closest collider
     among `obstacle_ids`, using PyBullet getClosestPoints.
@@ -32,9 +30,7 @@ def make_pybullet_env_sdf(
 
         # Move probe to query point
         p.resetBasePositionAndOrientation(
-            bodyUniqueId=probe_body,
-            posObj=point,
-            ornObj=[0.0, 0.0, 0.0, 1.0]
+            bodyUniqueId=probe_body, posObj=point, ornObj=[0.0, 0.0, 0.0, 1.0]
         )
 
         d_min = max_distance
@@ -43,9 +39,7 @@ def make_pybullet_env_sdf(
         for obs_id in obstacle_ids:
             # Query closest points within a given search radius
             cps = p.getClosestPoints(
-                bodyA=probe_body,
-                bodyB=obs_id,
-                distance=max_distance
+                bodyA=probe_body, bodyB=obs_id, distance=max_distance
             )
 
             for cp in cps:
@@ -70,15 +64,17 @@ def make_pybullet_env_sdf(
         return d_min
 
     return env_sdf
+
+
 def visualize_sdf_slice(
     env_sdf,
     height=0.0,
     x_range=(-3.0, 3.0),
     y_range=(-3.0, 3.0),
     resolution=0.1,
-    cmap='seismic',
+    cmap="seismic",
     vmin=-1.0,
-    vmax=1.0
+    vmax=1.0,
 ):
     """
     Visualizes a 2D slice of the SDF at a given height (z value).
@@ -99,13 +95,13 @@ def visualize_sdf_slice(
     plt.imshow(
         sdf_values,
         extent=(x_range[0], x_range[1], y_range[0], y_range[1]),
-        origin='lower',
+        origin="lower",
         cmap=cmap,
         vmin=vmin,
-        vmax=vmax
+        vmax=vmax,
     )
-    plt.colorbar(label='Signed Distance')
-    plt.title(f'SDF Slice at z={height}')
-    plt.xlabel('X')
-    plt.ylabel('Y')
+    plt.colorbar(label="Signed Distance")
+    plt.title(f"SDF Slice at z={height}")
+    plt.xlabel("X")
+    plt.ylabel("Y")
     plt.show()

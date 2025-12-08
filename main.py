@@ -1,17 +1,16 @@
+import random
+import time
+
 import pybullet as p
 import pybullet_data
-import time
+
 from rrt import RRT
+from rrt_cbf import RRT_CBF
 from useful_code import *
-import random
-from matplotlib import pyplot as plt   
+from matplotlib import pyplot as plt
 from sdf import make_pybullet_env_sdf, visualize_sdf_slice
 
-
-
-#####################################################
-##################### MAIN CODE #####################
-#####################################################
+# Main Code
 def get_sphere_centers(robot_id, joint_q, spheres):
     """
     Given joint positions joint_q (length n),
@@ -39,6 +38,8 @@ def get_sphere_centers(robot_id, joint_q, spheres):
         centers.append(world_pos)
 
     return centers
+
+
 def visualize_spherical_robot(robot_id, joint_q, spheres, color=[1, 0, 0, 0.4]):
     """
     Draw translucent spheres for the spherical approximation of the robot.
@@ -60,6 +61,8 @@ def visualize_spherical_robot(robot_id, joint_q, spheres, color=[1, 0, 0, 0.4]):
             baseVisualShapeIndex=visual_id,
             basePosition=center.tolist(),
         )
+
+
 def get_link_axis_and_length(robot_id, link_index, q_ref=None):
     """Compute local axis and length of link using a reference configuration."""
     if q_ref is None:
@@ -77,7 +80,9 @@ def get_link_axis_and_length(robot_id, link_index, q_ref=None):
     # Approximate "child joint" as the next link’s frame
     # (works for a simple chain; adjust if your topology is different)
     if link_index + 1 < p.getNumJoints(robot_id):
-        child_state = p.getLinkState(robot_id, link_index + 1, computeForwardKinematics=True)
+        child_state = p.getLinkState(
+            robot_id, link_index + 1, computeForwardKinematics=True
+        )
         pos_child = np.array(child_state[0])
     else:
         # Last link: just assume a small offset along some direction
@@ -95,17 +100,20 @@ def get_link_axis_and_length(robot_id, link_index, q_ref=None):
     return dir_local, length
 
 
-def make_link_spheres_from_fk(robot_id, link_index, radius, q_ref=None,
-                              max_spacing_factor=1.5, min_spheres=2):
+def make_link_spheres_from_fk(
+    robot_id, link_index, radius, q_ref=None, max_spacing_factor=1.5, min_spheres=2
+):
     axis_local, length = get_link_axis_and_length(robot_id, link_index, q_ref=q_ref)
 
     # If the link is degenerate, just place one sphere at the link frame
     if length < 1e-6:
-        return [{
-            "link_index": link_index,
-            "local_pos": [0.0, 0.0, 0.0],
-            "radius": radius,
-        }]
+        return [
+            {
+                "link_index": link_index,
+                "local_pos": [0.0, 0.0, 0.0],
+                "radius": radius,
+            }
+        ]
 
     # Decide max spacing between sphere centers based on radius
     max_spacing = max_spacing_factor * radius
@@ -119,29 +127,28 @@ def make_link_spheres_from_fk(robot_id, link_index, radius, q_ref=None,
     for i in range(n_spheres):
         t = i / (n_spheres - 1)  # from 0 to 1
         local_pos = (axis_local * (length * t)).tolist()
-        spheres.append({
-            "link_index": link_index,
-            "local_pos": local_pos,
-            "radius": radius,
-        })
+        spheres.append(
+            {
+                "link_index": link_index,
+                "local_pos": local_pos,
+                "radius": radius,
+            }
+        )
     return spheres
 
 
 if __name__ == "__main__":
-    
-    #######################
-    #### PROBLEM SETUP ####
-    #######################
+    # Problem setup
 
     # Initialize PyBullet
     p.connect(p.GUI)
-    p.setAdditionalSearchPath(pybullet_data.getDataPath()) # For default URDFs
+    p.setAdditionalSearchPath(pybullet_data.getDataPath())  # For default URDFs
     p.setGravity(0, 0, -9.8)
 
     # Load the plane and robot arm
     ground_id = p.loadURDF("plane.urdf")
     arm_id = p.loadURDF("robot.urdf", [0, 0, 0], useFixedBase=True)
-# After loading arm_id
+    # After loading arm_id
     q_ref = [0.0] * p.getNumJoints(arm_id)
 
     ROBOT_SPHERES = []
@@ -152,71 +159,100 @@ if __name__ == "__main__":
             radius=0.08,
             q_ref=q_ref,
             max_spacing_factor=1.0,  # tune overlap
-            min_spheres=2            # at least 2 spheres per link
+            min_spheres=2,  # at least 2 spheres per link
         )
 
     # Add Collision Objects
-    collision_ids = [ground_id] # add the ground to the collision list
-    #collision_ids = []
-    collision_positions = [[0.3, 0.5, 0.251], [-0.3, 0.3, 0.101], [-1, -0.15, 0.251], [-1, -0.15, 0.752], [-0.5, -1, 0.251], [0.5, -0.35, 0.201], [0.5, -0.35, 0.602]]
-    collision_orientations =  [[0, 0, 0.5], [0, 0, 0.2], [0, 0, 0],[0, 0, 1], [0, 0, 0], [0, 0, .25], [0, 0, 0.5]]
+    collision_ids = [ground_id]  # add the ground to the collision list
+    # collision_ids = []
+    collision_positions = [
+        [0.3, 0.5, 0.251],
+        [-0.3, 0.3, 0.101],
+        [-1, -0.15, 0.251],
+        [-1, -0.15, 0.752],
+        [-0.5, -1, 0.251],
+        [0.5, -0.35, 0.201],
+        [0.5, -0.35, 0.602],
+    ]
+    collision_orientations = [
+        [0, 0, 0.5],
+        [0, 0, 0.2],
+        [0, 0, 0],
+        [0, 0, 1],
+        [0, 0, 0],
+        [0, 0, 0.25],
+        [0, 0, 0.5],
+    ]
     collision_scales = [0.5, 0.25, 0.5, 0.5, 0.5, 0.4, 0.4]
     for i in range(len(collision_scales)):
-        collision_ids.append(p.loadURDF("cube.urdf",
-            basePosition=collision_positions[i],  # Position of the cube
-            baseOrientation=p.getQuaternionFromEuler(collision_orientations[i]),  # Orientation of the cube
-            globalScaling=collision_scales[i]  # Scale the cube to half size
-        ))
+        collision_ids.append(
+            p.loadURDF(
+                "cube.urdf",
+                basePosition=collision_positions[i],  # Position of the cube
+                baseOrientation=p.getQuaternionFromEuler(
+                    collision_orientations[i]
+                ),  # Orientation of the cube
+                globalScaling=collision_scales[i],  # Scale the cube to half size
+            )
+        )
 
     # Goal Joint Positions for the Robot
-    goal_positions = [[-2.54, 0.15, -0.15], [-1.79,0.15,-0.15],[0.5, 0.15,-0.15], [1.7,0.2,-0.15],[-2.54, 0.15, -0.15]]
+    goal_positions = [
+        [-2.54, 0.15, -0.15],
+        [-1.79, 0.15, -0.15],
+        [0.5, 0.15, -0.15],
+        [1.7, 0.2, -0.15],
+        [-2.54, 0.15, -0.15],
+    ]
 
     # Joint Limits of the Robot
     joint_limits = [[-np.pi, np.pi], [0, np.pi], [-np.pi, np.pi]]
 
     # A3xN path array that will be filled with waypoints through all the goal positions
-    path_saved = np.array([[-2.54, 0.15, -0.15]]) # Start at the first goal position
+    path_saved = np.array([[-2.54, 0.15, -0.15]])  # Start at the first goal position
 
-    ####################################################################################################
-    #### YOUR CODE HERE: RUN RRT MOTION PLANNER FOR ALL goal_positions (starting at goal position 1) ###
-    ####################################################################################################
-   
-
-
-    ################################################################################
-    ####  RUN THE SIMULATION AND MOVE THE ROBOT ALONG PATH_SAVED ###################
-    ################################################################################
-
+    # Run the simulation and move the robot along the saved path
     # Set the initial joint positions
     for joint_index, joint_pos in enumerate(goal_positions[0]):
         p.resetJointState(arm_id, joint_index, joint_pos)
     sdf_env = make_pybullet_env_sdf(collision_ids, max_distance=5.5, probe_radius=0.01)
     visualize_sdf_slice(
-        env_sdf=make_pybullet_env_sdf(collision_ids, max_distance=5.5, probe_radius=0.01),
+        env_sdf=make_pybullet_env_sdf(
+            collision_ids, max_distance=5.5, probe_radius=0.01
+        ),
         height=0.2,
         x_range=(-3.0, 3.0),
         y_range=(-3.0, 3.0),
         resolution=0.1,
-        cmap='seismic',
+        cmap="seismic",
         vmin=-5.5,
-        vmax=5.5
+        vmax=5.5,
     )
-    from rrt_cbf import RRT_CBF
-    from rrt import RRT
-    visualize_spherical_robot(arm_id, goal_positions[0], ROBOT_SPHERES, color=[1, 0, 0, 0.4])
-    for i in range(len(goal_positions)-1):
-        q_start = goal_positions[i]
-        q_goal = goal_positions[i+1]
 
-        rrt_planner = RRT_CBF(q_start, q_goal, arm_id, collision_ids, joint_limits,
-                            sdf_env,
-                            ROBOT_SPHERES,
-                            joint_indices=[0,1,2],
-                            max_iter=5000,
-                            step_size=0.5,
-                            alpha=50.0,
-                            d_safe=0.12)
-        path_segment = rrt_planner.plan() #change to plan2() for RRT*, it runs at max iteration so it will take a bit but will give great paths
+    visualize_spherical_robot(
+        arm_id, goal_positions[0], ROBOT_SPHERES, color=[1, 0, 0, 0.4]
+    )
+    for i in range(len(goal_positions) - 1):
+        q_start = goal_positions[i]
+        q_goal = goal_positions[i + 1]
+
+        rrt_planner = RRT_CBF(
+            q_start,
+            q_goal,
+            arm_id,
+            collision_ids,
+            joint_limits,
+            sdf_env,
+            ROBOT_SPHERES,
+            joint_indices=[0, 1, 2],
+            max_iter=5000,
+            step_size=0.5,
+            alpha=50.0,
+            d_safe=0.12,
+        )
+        path_segment = (
+            rrt_planner.plan()
+        )  # change to plan2() for RRT*, it runs at max iteration so it will take a bit but will give great paths
         # rrt_planner = RRT(q_start, q_goal, arm_id, collision_ids, joint_limits,
         #                     max_iter=5000,
         #                     step_size=0.5)
@@ -225,25 +261,31 @@ if __name__ == "__main__":
         if path_segment is None:
             print(f"RRT failed to find a path from {q_start} to {q_goal}")
         else:
-            print(f"RRT found a path from {q_start} to {q_goal} with {len(path_segment)} waypoints")
+            print(
+                f"RRT found a path from {q_start} to {q_goal} with {len(path_segment)} waypoints"
+            )
             path_saved = np.vstack((path_saved, path_segment[1:]))
-# Move through the waypoints
+    # Move through the waypoints
     for waypoint in path_saved:
         # "move" to next waypoints
         for joint_index, joint_pos in enumerate(waypoint):
-        # run velocity control until waypoint is reached
+            # run velocity control until waypoint is reached
             while True:
-                #get current joint positions
+                # get current joint positions
                 goal_positions = [p.getJointState(arm_id, i)[0] for i in range(3)]
                 # calculate the displacement to reach the next waypoint
-                displacement_to_waypoint = waypoint-goal_positions
+                displacement_to_waypoint = waypoint - goal_positions
                 # check if goal is reached
                 max_speed = 0.05
-                if(np.linalg.norm(displacement_to_waypoint) < max_speed):
+                if np.linalg.norm(displacement_to_waypoint) < max_speed:
                     break
                 else:
                     # calculate the "velocity" to reach the next waypoint
-                    velocities = np.min((np.linalg.norm(displacement_to_waypoint), max_speed))*displacement_to_waypoint/np.linalg.norm(displacement_to_waypoint)
+                    velocities = (
+                        np.min((np.linalg.norm(displacement_to_waypoint), max_speed))
+                        * displacement_to_waypoint
+                        / np.linalg.norm(displacement_to_waypoint)
+                    )
                     for joint_index, joint_step in enumerate(velocities):
                         p.setJointMotorControl2(
                             bodyIndex=arm_id,
@@ -251,12 +293,13 @@ if __name__ == "__main__":
                             controlMode=p.VELOCITY_CONTROL,
                             targetVelocity=joint_step,
                         )
-                        
-                #Take a simulation step
-                p.stepSimulation()            
+
+                # Take a simulation step
+                p.stepSimulation()
         time.sleep(1.0 / 240.0)
 
-
     # Disconnect from PyBullet
-    time.sleep(100) # Remove this line -- it is just to keep the GUI open when you first run this starter code
+    time.sleep(
+        100
+    )  # Remove this line -- it is just to keep the GUI open when you first run this starter code
     p.disconnect()

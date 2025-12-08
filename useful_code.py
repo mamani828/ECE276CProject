@@ -1,19 +1,22 @@
-
 import pybullet as p
 import numpy as np
 from scipy.spatial.transform import Rotation as R
 
+
 def quaternion_to_rotation_matrix(quaternion):
     x, y, z, w = quaternion
-    
+
     # Calculate the elements of the rotation matrix
-    R = np.array([
-        [1 - 2*(y**2 + z**2), 2*(x*y - z*w), 2*(x*z + y*w)],
-        [2*(x*y + z*w), 1 - 2*(x**2 + z**2), 2*(y*z - x*w)],
-        [2*(x*z - y*w), 2*(y*z + x*w), 1 - 2*(x**2 + y**2)]
-    ])
-    
+    R = np.array(
+        [
+            [1 - 2 * (y**2 + z**2), 2 * (x * y - z * w), 2 * (x * z + y * w)],
+            [2 * (x * y + z * w), 1 - 2 * (x**2 + z**2), 2 * (y * z - x * w)],
+            [2 * (x * z - y * w), 2 * (y * z + x * w), 1 - 2 * (x**2 + y**2)],
+        ]
+    )
+
     return R
+
 
 def plot_link_coordinate_frames(robot_id, link_indices, axis_length=0.1, duration=0):
     """
@@ -45,8 +48,12 @@ def plot_link_coordinate_frames(robot_id, link_indices, axis_length=0.1, duratio
         z_axis_world = rot_matrix @ z_axis
 
         # Add the axes as debug lines
-        p.addUserDebugLine(link_pos, link_pos + x_axis_world, [1, 0, 0], lineWidth=2, lifeTime=duration)  # Red for x-axis
-        p.addUserDebugLine(link_pos, link_pos + y_axis_world, [0, 1, 0], lineWidth=2, lifeTime=duration)  # Green for y-axis
-        p.addUserDebugLine(link_pos, link_pos + z_axis_world, [0, 0, 1], lineWidth=2, lifeTime=duration)  # Blue for z-axis
-
-
+        p.addUserDebugLine(
+            link_pos, link_pos + x_axis_world, [1, 0, 0], lineWidth=2, lifeTime=duration
+        )  # Red for x-axis
+        p.addUserDebugLine(
+            link_pos, link_pos + y_axis_world, [0, 1, 0], lineWidth=2, lifeTime=duration
+        )  # Green for y-axis
+        p.addUserDebugLine(
+            link_pos, link_pos + z_axis_world, [0, 0, 1], lineWidth=2, lifeTime=duration
+        )  # Blue for z-axis
