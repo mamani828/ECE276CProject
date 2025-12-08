@@ -268,6 +268,7 @@ if __name__ == "__main__":
             )
             path_saved = np.vstack((path_saved, path_segment[1:]))
     # Move through the waypoints
+    print(f"Number of nodes {len(rrt_planner.node_list)}")
     for waypoint in path_saved:
         # "move" to next waypoints
         for joint_index, joint_pos in enumerate(waypoint):
