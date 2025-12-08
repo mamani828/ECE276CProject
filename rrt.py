@@ -1,5 +1,5 @@
 import numpy as np
-from utils import get_ee_position, plot_link_coordinate_frames, check_edge_collision
+from utils import get_ee_position, plot_link_coordinate_frames, check_edge_collision, plot_rrt_edge
 
 class Node:
     def __init__(self, joint_angles):
@@ -97,6 +97,15 @@ to only max_iter iterations."""
             new_node = Node(q_new)
             new_node.parent = nearest
             self.node_list.append(new_node)
+            plot_rrt_edge(
+                robot_id=self.robot_id,
+                q_from=nearest.joint_angles,
+                q_to=new_node.joint_angles,
+                ee_link_index=self.ee_link_index,
+                line_color=[0, 1, 0],  # green tree
+                line_width=1,
+                duration=0
+            )
             if np.linalg.norm(new_node.joint_angles - self.q_goal.joint_angles) <= self.step_size:
                 if not check_edge_collision(
                     self.robot_id, self.obstacle_ids,

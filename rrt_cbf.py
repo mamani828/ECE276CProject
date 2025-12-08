@@ -1,6 +1,6 @@
 import pybullet as p
 import numpy as np
-from utils import check_edge_collision, get_ee_position, plot_link_coordinate_frames
+from utils import plot_path,check_edge_collision, get_ee_position, plot_link_coordinate_frames, plot_rrt_edge
 
 class Node:
     def __init__(self, joint_angles):
@@ -141,19 +141,23 @@ class RRT_CBF:
         h = np.array(h_list)              # (m,)
         dh = np.vstack(dh_list)           # (m, n)
         return h, dh
-    def _project_onto_cbf_constraints(self, u_des, h, dh):
+    def _project_onto_cbf_constraints(self, u_des, h, dh, max_iters=10):
         u = u_des.copy()
-        for i in range(h.shape[0]):
-            if h[i] > self.d_safe:    # constraint definitely inactive
-                continue
-            a = dh[i]
-            b = -self.alpha * h[i]
-            val = a @ u
-            if val < b:
-                denom = np.dot(a, a) + 1e-10
-                u = u + (b - val) / denom * a
+        m = h.shape[0]
+        for _ in range(max_iters):
+            changed = False
+            for i in range(m):
+                # Enforce constraint whenever h[i] <= d_safe_threshold (or simply always)
+                a = dh[i]
+                b = -self.alpha * h[i]
+                val = a @ u
+                if val < b:
+                    denom = np.dot(a, a) + 1e-10
+                    u = u + (b - val) / denom * a
+                    changed = True
+            if not changed:
+                break
         return u
-
     def step(self, q_from, q_to):
         """
         CBF-constrained steer:
@@ -176,13 +180,6 @@ class RRT_CBF:
         # barrier values and gradients at q_from
         h, dh = self.sdf_and_grad(q_from)
 
-        # if everything is far from obstacles, just go u_des
-        if np.all(h > 0.5 * self.d_safe):
-            q_new = q_from + u_des
-            q_new = np.clip(q_new, self.q_limits[:, 0], self.q_limits[:, 1])
-            return q_new
-
-        # project u_des onto CBF-feasible set
         u_safe = self._project_onto_cbf_constraints(u_des, h, dh)
 
         # if projection fails (tiny movement), you effectively stop
@@ -223,6 +220,15 @@ class RRT_CBF:
             new_node = Node(q_new)
             new_node.parent = nearest
             self.node_list.append(new_node)
+            plot_rrt_edge(
+                robot_id=self.robot_id,
+                q_from=nearest.joint_angles,
+                q_to=new_node.joint_angles,
+                ee_link_index=self.ee_link_index,
+                line_color=[0, 1, 0],
+                line_width=1,
+                duration=0
+            )
 
             # Try to connect to goal if close enough
             if np.linalg.norm(new_node.joint_angles - self.q_goal.joint_angles) <= self.step_size:
@@ -233,19 +239,13 @@ class RRT_CBF:
                 if np.linalg.norm(q_goal_proj - self.q_goal.joint_angles) < 1e-3:
                     self.q_goal.parent = new_node
 
-                    # Build path
+                    # Build path and return immediately
                     path = []
                     node = self.q_goal
                     while node is not None:
                         path.append(np.asarray(node.joint_angles, dtype=float))
                         node = node.parent
                     path.reverse()
-
-                    # Optional visualization
-                    arm_id = self.robot_id
-                    plot_link_coordinate_frames(arm_id, [0, 1, 2],
-                                                axis_length=0.1, duration=0)
-
                     return np.vstack(path)
 
         # Failed to find a path within max_iter

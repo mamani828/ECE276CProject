@@ -55,6 +55,22 @@ def check_node_collision(robot_id, object_ids, joint_position):
             if contact_points:  # If any contact points exist, a collision is detected
                 return True # exit early
     return False
+def plot_rrt_edge(robot_id, q_from, q_to, ee_link_index=2,
+                  line_color=[0, 1, 0], line_width=1, duration=0):
+    """
+    Draw a single edge of the RRT (in workspace) between two joint configs.
+    """
+    p_from = get_ee_position(robot_id, q_from, ee_link_index)
+    p_to   = get_ee_position(robot_id, q_to, ee_link_index)
+
+    p.addUserDebugLine(
+        lineFromXYZ=p_from.tolist(),
+        lineToXYZ=p_to.tolist(),
+        lineColorRGB=line_color,
+        lineWidth=line_width,
+        lifeTime=duration,   # 0 => persistent
+    )
+
 def quaternion_to_rotation_matrix(quaternion):
     x, y, z, w = quaternion
     

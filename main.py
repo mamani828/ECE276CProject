@@ -190,7 +190,7 @@ if __name__ == "__main__":
     # Set the initial joint positions
     for joint_index, joint_pos in enumerate(goal_positions[0]):
         p.resetJointState(arm_id, joint_index, joint_pos)
-    make_pybullet_env_sdf(collision_ids, max_distance=5.5, probe_radius=0.01)
+    sdf_env = make_pybullet_env_sdf(collision_ids, max_distance=5.5, probe_radius=0.01)
     visualize_sdf_slice(
         env_sdf=make_pybullet_env_sdf(collision_ids, max_distance=5.5, probe_radius=0.01),
         height=0.2,
@@ -209,13 +209,13 @@ if __name__ == "__main__":
         q_goal = goal_positions[i+1]
 
         rrt_planner = RRT_CBF(q_start, q_goal, arm_id, collision_ids, joint_limits,
-                            make_pybullet_env_sdf(collision_ids, max_distance=5.5, probe_radius=0.01),
+                            sdf_env,
                             ROBOT_SPHERES,
                             joint_indices=[0,1,2],
                             max_iter=5000,
-                            step_size=0.15,
+                            step_size=0.05,
                             alpha=10.0,
-                            d_safe=0.001)
+                            d_safe=0.15)
         path_segment = rrt_planner.plan() #change to plan2() for RRT*, it runs at max iteration so it will take a bit but will give great paths
         # rrt_planner = RRT(q_start, q_goal, arm_id, collision_ids, joint_limits,
         #                     max_iter=5000,
