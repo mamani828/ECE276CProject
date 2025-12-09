@@ -7,6 +7,38 @@ from utils import (
     plot_link_coordinate_frames,
     plot_rrt_edge,
 )
+def check_node_collision(robot_id, object_ids, joint_indices, joint_position, distance=0.0):
+    """
+    Checks for collisions between a robot and a set of objects in PyBullet.
+
+    Args:
+        robot_id (int): ID of the robot in PyBullet.
+        object_ids (list[int]): IDs of obstacles in PyBullet.
+        joint_indices (list[int]): PyBullet joint indices corresponding to joint_position.
+        joint_position (array-like): Joint positions (same length as joint_indices).
+        distance (float): Distance threshold for getClosestPoints (0.0 = actual contact).
+
+    Returns:
+        bool: True if a collision is detected, False otherwise.
+    """
+    # Set joint positions using the given joint_indices
+    for j_pos, j_idx in zip(joint_position, joint_indices):
+        p.resetJointState(robot_id, j_idx, float(j_pos))
+
+    # Check each link (including base with linkIndex=-1 if desired)
+    num_joints = p.getNumJoints(robot_id)
+    for object_id in object_ids:
+        for link_index in range(-1, num_joints):
+            contact_points = p.getClosestPoints(
+                bodyA=robot_id,
+                bodyB=object_id,
+                distance=distance,
+                linkIndexA=link_index,
+            )
+            if contact_points:
+                return True
+
+    return False
 
 
 class Node:
@@ -206,6 +238,16 @@ class RRT_CBF:
                     dtype=float,
                 )
 
+            # Reject samples that are already in the unsafe set
+            if check_node_collision(
+                self.robot_id,
+                self.obstacle_ids,
+                self.joint_indices,
+                q_rand,
+                distance=0.0,  # or self.d_safe
+            ):
+                continue  # reject this sample and draw a new one
+
             # Nearest node in joint space
             nearest = self.get_nearest_node(q_rand)
 
@@ -214,6 +256,16 @@ class RRT_CBF:
 
             # If we couldn't move (e.g. CBF blocked), skip
             if np.allclose(q_new, nearest.joint_angles):
+                continue
+
+            # Reject new node if it ends up inside unsafe set
+            if check_node_collision(
+                self.robot_id,
+                self.obstacle_ids,
+                self.joint_indices,
+                q_new,
+                distance=0.0,  # or self.d_safe
+            ):
                 continue
 
             # Add new node to the tree
@@ -234,6 +286,16 @@ class RRT_CBF:
             if np.linalg.norm(new_node.joint_angles - self.q_goal.joint_angles) <= self.step_size:
                 q_goal_proj = self.step(new_node.joint_angles, self.q_goal.joint_angles)
 
+                # Optional: also check that the projected goal config is safe
+                if check_node_collision(
+                    self.robot_id,
+                    self.obstacle_ids,
+                    self.joint_indices,
+                    q_goal_proj,
+                    distance=0.0,  # or self.d_safe
+                ):
+                    continue
+
                 # If CBF allows us to reach (or nearly reach) the goal config
                 if np.linalg.norm(q_goal_proj - self.q_goal.joint_angles) < self.step_size:
                     # Make an actual goal node that lives in the tree
@@ -247,7 +309,7 @@ class RRT_CBF:
                         q_from=new_node.joint_angles,
                         q_to=goal_node.joint_angles,
                         ee_link_index=self.ee_link_index,
-                        line_color=[1, 0, 0],  # or [0, 1, 0] if you prefer
+                        line_color=[1, 0, 0],
                         line_width=2,
                         duration=0,
                     )
@@ -261,9 +323,9 @@ class RRT_CBF:
                     path.reverse()
                     return np.vstack(path)
 
-
         # Failed to find a path within max_iter
         return None
+
 
     def get_nearest_node(self, q_rand):
         """Find the nearest node in the tree to q_rand."""

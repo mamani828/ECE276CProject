@@ -156,7 +156,7 @@ if __name__ == "__main__":
         ROBOT_SPHERES += make_link_spheres_from_fk(
             arm_id,
             link_index=link_idx,
-            radius=0.05,
+            radius=0.1,
             q_ref=q_ref,
             max_spacing_factor=1.0,  # tune overlap
             min_spheres=2,  # at least 2 spheres per link

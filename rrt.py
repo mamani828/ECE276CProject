@@ -111,7 +111,7 @@ class RRT:
                     [np.random.uniform(lo, hi) for (lo, hi) in self.q_limits],
                     dtype=float,
                 )
-
+            #TODO add check node collision here
             nearest = self.get_nearest_node(q_rand)
 
             # Steer from nearest toward sample, capped by self.step_size
