@@ -156,7 +156,7 @@ if __name__ == "__main__":
         ROBOT_SPHERES += make_link_spheres_from_fk(
             arm_id,
             link_index=link_idx,
-            radius=0.08,
+            radius=0.05,
             q_ref=q_ref,
             max_spacing_factor=1.0,  # tune overlap
             min_spheres=2,  # at least 2 spheres per link
@@ -250,7 +250,7 @@ if __name__ == "__main__":
             max_iter=5000,
             step_size=0.5,
             alpha=50.0,
-            d_safe=0.12,
+            d_safe=0.1,
         )
         path_segment = (
             rrt_planner.plan()
@@ -300,9 +300,9 @@ if __name__ == "__main__":
                             targetVelocity=velocity,
                         )
                 # Visualize the robot at the current waypoint
-                visualize_spherical_robot(
-                    arm_id, waypoint, ROBOT_SPHERES, color=[1, 0, 0, 0.4]
-                )
+                # visualize_spherical_robot(
+                #     arm_id, waypoint, ROBOT_SPHERES, color=[1, 0, 0, 0.4]
+                # )
                 # Take a simulation step
                 p.stepSimulation()
         time.sleep(1.0 / 240.0)

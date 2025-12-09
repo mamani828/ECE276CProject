@@ -198,7 +198,7 @@ class RRT_CBF:
         """
         for _ in range(self.max_iter):
             # Sample goal with some probability, otherwise sample uniformly
-            if np.random.rand() < 0.20:
+            if np.random.rand() < 0.10:
                 q_rand = self.q_goal.joint_angles.copy()
             else:
                 q_rand = np.array(
@@ -231,28 +231,36 @@ class RRT_CBF:
             )
 
             # Try to connect to goal if close enough
-            if (
-                np.linalg.norm(new_node.joint_angles - self.q_goal.joint_angles)
-                <= self.step_size
-            ):
-                # One last CBF step toward exact goal
+            if np.linalg.norm(new_node.joint_angles - self.q_goal.joint_angles) <= self.step_size:
                 q_goal_proj = self.step(new_node.joint_angles, self.q_goal.joint_angles)
 
                 # If CBF allows us to reach (or nearly reach) the goal config
-                if (
-                    np.linalg.norm(q_goal_proj - self.q_goal.joint_angles)
-                    < self.step_size
-                ):
-                    self.q_goal.parent = new_node
+                if np.linalg.norm(q_goal_proj - self.q_goal.joint_angles) < self.step_size:
+                    # Make an actual goal node that lives in the tree
+                    goal_node = Node(q_goal_proj)
+                    goal_node.parent = new_node
+                    self.node_list.append(goal_node)
 
-                    # Build path and return immediately
+                    # Draw the final edge in the visualization
+                    plot_rrt_edge(
+                        robot_id=self.robot_id,
+                        q_from=new_node.joint_angles,
+                        q_to=goal_node.joint_angles,
+                        ee_link_index=self.ee_link_index,
+                        line_color=[1, 0, 0],  # or [0, 1, 0] if you prefer
+                        line_width=2,
+                        duration=0,
+                    )
+
+                    # Build path from this goal_node
                     path = []
-                    node = self.q_goal
+                    node = goal_node
                     while node is not None:
                         path.append(np.asarray(node.joint_angles, dtype=float))
                         node = node.parent
                     path.reverse()
                     return np.vstack(path)
+
 
         # Failed to find a path within max_iter
         return None
