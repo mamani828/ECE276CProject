@@ -1,0 +1,200 @@
+<robot name="dual_three_link_robot">
+		
+	<material name="black">
+		<color rgba="0 0 0 0.7"/>
+	</material>
+	<material name="white">
+		<color rgba="1 1 1 0.7"/>
+	</material>
+
+	<link name="base"/>
+
+	<!-- ========== LEFT ARM ========== -->
+
+	<link name="arm1_left">
+		<visual>
+			<origin rpy="0 0 0" xyz="0 0 0.1" />
+	        <geometry>
+	          <cylinder radius="0.02" length="0.15" />
+	        </geometry>
+			<material name="black"/>
+		</visual>
+	</link>
+
+	<joint name="baseHinge_left" type="revolute">
+		<axis rpy="0 0 0" xyz="0 0 1"/>
+		<parent link="base"/>
+		<child link="arm1_left"/>
+		<!-- Offset the left arm a bit along +y -->
+		<origin rpy="0 0 0" xyz="0 0.1 0"/>
+		<limit lower="-1000" upper="1000" effort="2000" velocity="1000"/>
+        <dynamics damping="0" friction="0"/>
+	</joint>
+
+    <link name="arm2_left">
+        <visual>
+            <origin rpy="0 -1.57 0" xyz="0.25 0 0" />
+            <geometry>
+                <cylinder radius="0.02" length="0.45" />
+            </geometry>
+            <material name="white" />
+        </visual>
+        <collision>
+            <origin rpy="0 -1.57 0" xyz="0.25 0 0" />
+            <geometry>
+                <cylinder radius="0.02" length="0.45" />
+            </geometry>
+        </collision>
+    </link>
+
+	<joint name="interArm_left" type="revolute">
+		<axis rpy="0 0 0" xyz="0 0 1"/>
+		<parent link="arm1_left"/>
+		<child link="arm2_left"/>
+		<origin rpy="1.57 0 0" xyz="0 0 0.2"/>
+		<limit lower="-1000" upper="1000" effort="2000" velocity="1000"/>
+        <dynamics damping="0" friction="0" />
+	</joint>
+
+    <link name="arm3_left">
+        <visual>
+            <origin rpy="0 1.57 0" xyz="0.25 0 0" />
+            <geometry>
+                <cylinder radius="0.02" length="0.45" />
+            </geometry>
+            <material name="white" />
+        </visual>
+        <collision>
+            <origin rpy="0 1.57 0" xyz="0.25 0 0" />
+            <geometry>
+                <cylinder radius="0.02" length="0.45" />
+            </geometry>
+        </collision>
+    </link>
+
+	<joint name="interArm2_left" type="revolute">
+		<axis rpy="0 0 0" xyz="0 0 1"/>
+		<parent link="arm2_left"/>
+		<child link="arm3_left"/>
+		<origin rpy="0 0 0" xyz="0.5 0 0"/>
+		<limit lower="-1000" upper="1000" effort="2000" velocity="1000"/>
+        <dynamics damping="0" friction="0" />
+	</joint>
+
+    <link name="ee_link_left">
+      <visual>
+        <origin rpy="0 0 0" xyz="0 0 0" />
+        <geometry>
+          <sphere radius="0.02" />
+        </geometry>
+        <material name="white"/>
+      </visual>
+      <collision>
+        <origin rpy="0 0 0" xyz="0 0 0" />
+        <geometry>
+          <sphere radius="0.02" />
+        </geometry>
+      </collision>
+    </link>
+
+    <joint name="ee_joint_left" type="fixed">
+      <parent link="arm3_left"/>
+      <child link="ee_link_left"/>
+      <origin rpy="0 0 0" xyz="0.5 0 0"/>
+    </joint>
+
+	<!-- ========== RIGHT ARM ========== -->
+
+	<link name="arm1_right">
+		<visual>
+			<origin rpy="0 0 0" xyz="0 0 0.1" />
+	        <geometry>
+	          <cylinder radius="0.02" length="0.15" />
+	        </geometry>
+			<material name="black"/>
+		</visual>
+	</link>
+
+	<joint name="baseHinge_right" type="revolute">
+		<axis rpy="0 0 0" xyz="0 0 1"/>
+		<parent link="base"/>
+		<child link="arm1_right"/>
+		<!-- Offset the right arm a bit along -y -->
+		<origin rpy="0 0 0" xyz="0 -0.1 0"/>
+		<limit lower="-1000" upper="1000" effort="2000" velocity="1000"/>
+        <dynamics damping="0" friction="0"/>
+	</joint>
+
+    <link name="arm2_right">
+        <visual>
+            <origin rpy="0 -1.57 0" xyz="0.25 0 0" />
+            <geometry>
+                <cylinder radius="0.02" length="0.45" />
+            </geometry>
+            <material name="white" />
+        </visual>
+        <collision>
+            <origin rpy="0 -1.57 0" xyz="0.25 0 0" />
+            <geometry>
+                <cylinder radius="0.02" length="0.45" />
+            </geometry>
+        </collision>
+    </link>
+
+	<joint name="interArm_right" type="revolute">
+		<axis rpy="0 0 0" xyz="0 0 1"/>
+		<parent link="arm1_right"/>
+		<child link="arm2_right"/>
+		<origin rpy="1.57 0 0" xyz="0 0 0.2"/>
+		<limit lower="-1000" upper="1000" effort="2000" velocity="1000"/>
+        <dynamics damping="0" friction="0" />
+	</joint>
+
+    <link name="arm3_right">
+        <visual>
+            <origin rpy="0 1.57 0" xyz="0.25 0 0" />
+            <geometry>
+                <cylinder radius="0.02" length="0.45" />
+            </geometry>
+            <material name="white" />
+        </visual>
+        <collision>
+            <origin rpy="0 1.57 0" xyz="0.25 0 0" />
+            <geometry>
+                <cylinder radius="0.02" length="0.45" />
+            </geometry>
+        </collision>
+    </link>
+
+	<joint name="interArm2_right" type="revolute">
+		<axis rpy="0 0 0" xyz="0 0 1"/>
+		<parent link="arm2_right"/>
+		<child link="arm3_right"/>
+		<origin rpy="0 0 0" xyz="0.5 0 0"/>
+		<limit lower="-1000" upper="1000" effort="2000" velocity="1000"/>
+        <dynamics damping="0" friction="0" />
+	</joint>
+
+    <link name="ee_link_right">
+      <visual>
+        <origin rpy="0 0 0" xyz="0 0 0" />
+        <geometry>
+          <sphere radius="0.02" />
+        </geometry>
+        <material name="white"/>
+      </visual>
+      <collision>
+        <origin rpy="0 0 0" xyz="0 0 0" />
+        <geometry>
+          <sphere radius="0.02" />
+        </geometry>
+      </collision>
+    </link>
+
+    <joint name="ee_joint_right" type="fixed">
+      <parent link="arm3_right"/>
+      <child link="ee_link_right"/>
+      <origin rpy="0 0 0" xyz="0.5 0 0"/>
+    </joint>
+
+</robot>

@@ -9,59 +9,65 @@ from rrt_cbf import RRT_CBF
 from useful_code import *
 from matplotlib import pyplot as plt
 from sdf import make_pybullet_env_sdf, visualize_sdf_slice
+from envs import get_env
 
 # Main Code
-def get_sphere_centers(robot_id, joint_q, spheres):
+def create_visual_spheres(spheres, color=[1, 0, 0, 0.4]):
     """
-    Given joint positions joint_q (length n),
-    return list of world-frame sphere centers c_k(q) for 'spheres'.
+    Creates visual-only sphere bodies in PyBullet.
+    Returns a list of body IDs corresponding to the spheres.
     """
-    # Set joint states in PyBullet
-    for j, qj in enumerate(joint_q):
-        p.resetJointState(robot_id, j, float(qj))
-
-    centers = []
+    sphere_body_ids = []
     for sph in spheres:
-        link_idx = sph["link_index"]
-        local_pos = np.asarray(sph["local_pos"], dtype=float)
-
-        # Get link pose in world frame
-        link_state = p.getLinkState(robot_id, link_idx, computeForwardKinematics=True)
-        link_pos = np.asarray(link_state[0], dtype=float)
-        link_orn = link_state[1]
-
-        # Rotation matrix from quaternion
-        R = np.array(p.getMatrixFromQuaternion(link_orn)).reshape(3, 3)
-
-        # Transform local sphere center to world
-        world_pos = link_pos + R @ local_pos
-        centers.append(world_pos)
-
-    return centers
-
-
-def visualize_spherical_robot(robot_id, joint_q, spheres, color=[1, 0, 0, 0.4]):
-    """
-    Draw translucent spheres for the spherical approximation of the robot.
-    """
-    centers = get_sphere_centers(robot_id, joint_q, spheres)
-
-    for center, sph in zip(centers, spheres):
         r = sph["radius"]
-
-        visual_id = p.createVisualShape(
+        
+        # Create the visual shape
+        v_id = p.createVisualShape(
             shapeType=p.GEOM_SPHERE,
             radius=r,
-            rgbaColor=color,  # [R,G,B,alpha]
+            rgbaColor=color
         )
-
-        p.createMultiBody(
+        
+        # Create the body (no mass, no collision, just visual)
+        # We start them at [0,0,0]; they will be moved immediately
+        b_id = p.createMultiBody(
             baseMass=0,
             baseCollisionShapeIndex=-1,
-            baseVisualShapeIndex=visual_id,
-            basePosition=center.tolist(),
+            baseVisualShapeIndex=v_id,
+            basePosition=[0, 0, 0] 
         )
+        sphere_body_ids.append(b_id)
+        
+    return sphere_body_ids
 
+def update_visual_spheres(robot_id, sphere_body_ids, spheres):
+    """
+    Updates the positions of the existing visual spheres based on the 
+    CURRENT robot state (simulation state).
+    """
+    # Cache link states to avoid calling getLinkState multiple times for the same link
+    link_states = {}
+    
+    for i, sph in enumerate(spheres):
+        link_idx = sph["link_index"]
+        
+        # Fetch link state only if we haven't already for this frame
+        if link_idx not in link_states:
+            state = p.getLinkState(robot_id, link_idx, computeForwardKinematics=True)
+            link_pos = np.array(state[0])
+            link_orn = state[1]
+            link_rot = np.array(p.getMatrixFromQuaternion(link_orn)).reshape(3, 3)
+            link_states[link_idx] = (link_pos, link_rot)
+            
+        # Retrieve cached state
+        pos, rot = link_states[link_idx]
+        local_pos = np.array(sph["local_pos"])
+        
+        # Calculate new world position: p_world = p_link + R_link * p_local
+        world_pos = pos + rot @ local_pos
+        
+        # Teleport the sphere body to the new location
+        p.resetBasePositionAndOrientation(sphere_body_ids[i], world_pos, [0, 0, 0, 1])
 
 def get_link_axis_and_length(robot_id, link_index, q_ref=None):
     """Compute local axis and length of link using a reference configuration."""
@@ -139,6 +145,7 @@ def make_link_spheres_from_fk(
 
 if __name__ == "__main__":
     # Problem setup
+    env = "simple"
 
     # Initialize PyBullet
     p.connect(p.GUI)
@@ -164,37 +171,7 @@ if __name__ == "__main__":
 
     # Add Collision Objects
     collision_ids = [ground_id]  # add the ground to the collision list
-    # collision_ids = []
-    collision_positions = [
-        [0.3, 0.5, 0.251],
-        [-0.3, 0.3, 0.101],
-        [-1, -0.15, 0.251],
-        [-1, -0.15, 0.752],
-        [-0.5, -1, 0.251],
-        [0.5, -0.35, 0.201],
-        [0.5, -0.35, 0.602],
-    ]
-    collision_orientations = [
-        [0, 0, 0.5],
-        [0, 0, 0.2],
-        [0, 0, 0],
-        [0, 0, 1],
-        [0, 0, 0],
-        [0, 0, 0.25],
-        [0, 0, 0.5],
-    ]
-    collision_scales = [0.5, 0.25, 0.5, 0.5, 0.5, 0.4, 0.4]
-
-    # Having colorful cubes
-    colors = [
-    [1, 0, 0, 1],   # red
-    [0, 1, 0, 1],   # green
-    [0, 0, 1, 1],   # blue
-    [1, 1, 0, 1],   # yellow
-    [1, 0, 1, 1],   # magenta
-    [0, 1, 1, 1],   # cyan
-    [0.8, 0.4, 0, 1], # orange
-    ]
+    collision_positions, collision_orientations, collision_scales, colors = get_env(env)
 
     for i in range(len(collision_scales)):
         uid = p.loadURDF(
@@ -228,12 +205,9 @@ if __name__ == "__main__":
         p.resetJointState(arm_id, joint_index, joint_pos)
     sdf_env = make_pybullet_env_sdf(collision_ids, max_distance=5.5, probe_radius=0.01)
     
-    for height in [0.2, 0.4, 0.6, 0.8, 1.0]:
-        visualize_sdf_slice(sdf_env, height=height)
+    # for height in [0.2, 0.4, 0.6, 0.8, 1.0]:
+    #     visualize_sdf_slice(sdf_env, height=height)
 
-    visualize_spherical_robot(
-        arm_id, goal_positions[0], ROBOT_SPHERES, color=[1, 0, 0, 0.4]
-    )
     for i in range(len(goal_positions) - 1):
         q_start = goal_positions[i]
         q_goal = goal_positions[i + 1]
@@ -267,8 +241,55 @@ if __name__ == "__main__":
                 f"RRT found a path from {q_start} to {q_goal} with {len(path_segment)} waypoints"
             )
             path_saved = np.vstack((path_saved, path_segment[1:]))
+    # Adding noise to the environment
+    stack_groups = {}
+    for idx, pos in enumerate(collision_positions):
+        # Rounding prevents floating point errors from separating stacked items
+        xy_key = (round(pos[0], 3), round(pos[1], 3))
+        if xy_key not in stack_groups:
+            stack_groups[xy_key] = []
+        stack_groups[xy_key].append(idx)
+
+    # Generate and Apply Noise
+    # Adjust these standard deviations to control noise magnitude
+    noise_std_pos = 0.05   # ~5cm variance
+    noise_std_yaw = 0.1    # ~5.7 degrees variance
+
+    for xy_key, indices in stack_groups.items():
+        # Generate ONE noise vector for this specific stack/location
+        # This ensures all cubes in a stack move together
+        dx = random.gauss(0, noise_std_pos)
+        dy = random.gauss(0, noise_std_pos)
+        d_yaw = random.gauss(0, noise_std_yaw)
+
+        for idx in indices:
+            # Retrieve original hardcoded values
+            orig_pos = collision_positions[idx]
+            orig_euler = collision_orientations[idx]
+
+            # Calculate new position (Preserve Z)
+            new_pos = [
+                orig_pos[0] + dx, 
+                orig_pos[1] + dy, 
+                orig_pos[2]
+            ]
+
+            # Calculate new orientation (Add noise only to Yaw/Z-rotation)
+            new_euler = [
+                orig_euler[0], 
+                orig_euler[1], 
+                orig_euler[2] + d_yaw
+            ]
+            new_quat = p.getQuaternionFromEuler(new_euler)
+
+            # Map index to pybullet body ID (collision_ids[0] is ground, so +1)
+            body_id = collision_ids[idx + 1]
+
+            # Apply the transform
+            p.resetBasePositionAndOrientation(body_id, new_pos, new_quat)
     # Move through the waypoints
     print(f"Number of nodes {len(rrt_planner.node_list)}")
+    live_sphere_ids = create_visual_spheres(ROBOT_SPHERES, color=[0, 1, 0, 0.3])
     for waypoint in path_saved:
         # "move" to next waypoints
         for joint_index, joint_pos in enumerate(waypoint):
@@ -305,6 +326,8 @@ if __name__ == "__main__":
                 # )
                 # Take a simulation step
                 p.stepSimulation()
+                # Update the visual spheres to the current robot state
+                update_visual_spheres(arm_id, live_sphere_ids, ROBOT_SPHERES)
         time.sleep(1.0 / 240.0)
 
     # Disconnect from PyBullet

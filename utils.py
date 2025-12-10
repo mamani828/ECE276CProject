@@ -204,3 +204,70 @@ def plot_path(robot_id, path, line_color=[0, 1, 1], line_width=2, duration=0):
         line_ids.append(line_id)
 
     return line_ids
+
+def is_state_valid(robot_id, joint_indices, q_target, obstacle_ids, check_self=True):
+    """
+    Checks if a target configuration q_target is valid.
+    
+    Args:
+        robot_id: PyBullet body ID of the robot.
+        joint_indices: List of joint indices corresponding to q_target.
+        q_target: List of joint angles (target configuration).
+        obstacle_ids: List of PyBullet body IDs for environmental obstacles.
+        check_self: Boolean, whether to check for robot-robot collisions.
+        
+    Returns:
+        True if valid (no collisions), False otherwise.
+    """
+    # 1. Save current state so we can restore it later
+    # (We don't want to mess up the simulation just to check a hypothetical state)
+    current_states = []
+    for j_idx in joint_indices:
+        current_states.append(p.getJointState(robot_id, j_idx)[0])
+        
+    # 2. Teleport robot to the target configuration
+    for i, j_idx in enumerate(joint_indices):
+        p.resetJointState(robot_id, j_idx, q_target[i])
+        
+    # 3. Step simulation "forward" by 0 seconds to update contact points
+    # (PyBullet requires this to update the AABBs for collision detection)
+    p.performCollisionDetection()
+    
+    is_valid = True
+    
+    # 4. Check Environment Collision (Robot vs Obstacles)
+    for obs_id in obstacle_ids:
+        # getContactPoints returns a list. If not empty, there is a collision.
+        contacts = p.getContactPoints(bodyA=robot_id, bodyB=obs_id)
+        if len(contacts) > 0:
+            is_valid = False
+            # print(f"Collision detected with obstacle ID {obs_id}")
+            break
+            
+    # 5. Check Self-Collision (Robot vs Robot)
+    if is_valid and check_self:
+        # getContactPoints with only bodyA checks for self-collision
+        self_contacts = p.getContactPoints(bodyA=robot_id, bodyB=robot_id)
+        
+        # Filter out adjacent links (they are connected by joints and always "touch")
+        # We only care if non-adjacent links touch (e.g., Left Hand hits Right Shoulder)
+        real_self_collision = False
+        for contact in self_contacts:
+            link_a = contact[3]
+            link_b = contact[4]
+            # Check if links are not adjacent (indices differ by more than 1)
+            # Note: This is a simple heuristic. For complex trees, use a specific adjacency matrix.
+            # But for your tree (Left chain vs Right chain), indices will differ significantly.
+            if abs(link_a - link_b) > 1:
+                real_self_collision = True
+                break
+        
+        if real_self_collision:
+            # print(f"Self-collision detected between link {link_a} and {link_b}")
+            is_valid = False
+
+    # 6. Restore original state
+    for i, j_idx in enumerate(joint_indices):
+        p.resetJointState(robot_id, j_idx, current_states[i])
+        
+    return is_valid
