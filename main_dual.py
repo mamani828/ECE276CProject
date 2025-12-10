@@ -7,63 +7,66 @@ from matplotlib import pyplot as plt
 
 # Assuming these exist in your local directory as before
 from rrt import RRT
-from rrt_cbf import RRT_CBF
+from rrt_cbf_dual import RRT_CBF
 from useful_code import *
 from sdf import make_pybullet_env_sdf, visualize_sdf_slice
-from utils import is_state_valid
+from utils import is_state_valid, mark_goal_configurations_dual
+from envs import get_env
 
 # Helper functions
-def get_sphere_centers(robot_id, joint_q, spheres, movable_joints):
+def create_visual_spheres(spheres, color=[0, 1, 0, 0.1]):
     """
-    Given joint positions joint_q (length N),
-    return list of world-frame sphere centers c_k(q) for 'spheres'.
+    Creates visual-only 'ghost' spheres.
+    Returns a list of body IDs.
     """
-    # Set joint states in PyBullet
-    # joint_q should correspond to the movable_joints list
-    for i, joint_idx in enumerate(movable_joints):
-        p.resetJointState(robot_id, joint_idx, float(joint_q[i]))
-
-    centers = []
+    sphere_body_ids = []
     for sph in spheres:
-        link_idx = sph["link_index"]
-        local_pos = np.asarray(sph["local_pos"], dtype=float)
-
-        # Get link pose in world frame
-        link_state = p.getLinkState(robot_id, link_idx, computeForwardKinematics=True)
-        link_pos = np.asarray(link_state[0], dtype=float)
-        link_orn = link_state[1]
-
-        # Rotation matrix from quaternion
-        R = np.array(p.getMatrixFromQuaternion(link_orn)).reshape(3, 3)
-
-        # Transform local sphere center to world
-        world_pos = link_pos + R @ local_pos
-        centers.append(world_pos)
-
-    return centers
-
-
-def visualize_spherical_robot(robot_id, joint_q, spheres, movable_joints, color=[1, 0, 0, 0.4]):
-    """
-    Draw translucent spheres for the spherical approximation of the robot.
-    """
-    centers = get_sphere_centers(robot_id, joint_q, spheres, movable_joints)
-
-    for center, sph in zip(centers, spheres):
         r = sph["radius"]
-
-        visual_id = p.createVisualShape(
+        
+        # Visual shape with low alpha (transparency)
+        v_id = p.createVisualShape(
             shapeType=p.GEOM_SPHERE,
             radius=r,
-            rgbaColor=color,  # [R,G,B,alpha]
+            rgbaColor=color
         )
-
-        p.createMultiBody(
+        
+        # Body with NO collision (-1)
+        b_id = p.createMultiBody(
             baseMass=0,
-            baseCollisionShapeIndex=-1,
-            baseVisualShapeIndex=visual_id,
-            basePosition=center.tolist(),
+            baseCollisionShapeIndex=-1, # Ghost object
+            baseVisualShapeIndex=v_id,
+            basePosition=[0, 0, 0] 
         )
+        sphere_body_ids.append(b_id)
+        
+    return sphere_body_ids
+
+def update_visual_spheres(robot_id, sphere_body_ids, spheres):
+    """
+    Updates the positions of existing spheres to match the robot's current state.
+    """
+    link_states = {} # Cache to avoid repeated PyBullet calls
+    
+    for i, sph in enumerate(spheres):
+        link_idx = sph["link_index"]
+        
+        # Fetch link state only if we haven't already for this frame
+        if link_idx not in link_states:
+            state = p.getLinkState(robot_id, link_idx, computeForwardKinematics=True)
+            link_pos = np.array(state[0])
+            link_orn = state[1]
+            link_rot = np.array(p.getMatrixFromQuaternion(link_orn)).reshape(3, 3)
+            link_states[link_idx] = (link_pos, link_rot)
+            
+        # Retrieve cached state
+        pos, rot = link_states[link_idx]
+        local_pos = np.array(sph["local_pos"])
+        
+        # Transform: World = Link_Pos + Rotation * Local_Pos
+        world_pos = pos + rot @ local_pos
+        
+        # Teleport sphere
+        p.resetBasePositionAndOrientation(sphere_body_ids[i], basePosition=world_pos, baseOrientation=[0, 0, 0, 1])
 
 
 def get_link_axis_and_length(robot_id, link_index, q_ref=None):
@@ -203,77 +206,7 @@ if __name__ == "__main__":
 
     # Setup Environment Obstacles
     collision_ids = [ground_id]
-    
-    if env == "simple":
-        # collision_ids = []
-        collision_positions = [
-            [0.3, 0.5, 0.251],
-            [-0.3, 0.3, 0.101],
-            [-1, -0.15, 0.251],
-            [-1, -0.15, 0.752],
-            [-0.5, -1, 0.251],
-            [0.5, -0.35, 0.201],
-            [0.5, -0.35, 0.602],
-        ]
-        collision_orientations = [
-            [0, 0, 0.5],
-            [0, 0, 0.2],
-            [0, 0, 0],
-            [0, 0, 1],
-            [0, 0, 0],
-            [0, 0, 0.25],
-            [0, 0, 0.5],
-        ]
-        collision_scales = [0.5, 0.25, 0.5, 0.5, 0.5, 0.4, 0.4]
-
-        # Having colorful cubes
-        colors = [
-        [1, 0, 0, 1],   # red
-        [0, 1, 0, 1],   # green
-        [0, 0, 1, 1],   # blue
-        [1, 1, 0, 1],   # yellow
-        [1, 0, 1, 1],   # magenta
-        [0, 1, 1, 1],   # cyan
-        [0.8, 0.4, 0, 1], # orange
-        ]
-    elif env == "complex":
-        # collision_ids = []
-        collision_positions = [
-            [0.3, 0.5, 0.251],
-            [-0.3, 0.3, 0.101],
-            [-1, -0.15, 0.251],
-            # [-1, -0.15, 0.752],
-            [-0.5, -1, 0.251],
-            # [-0.5, -1, 0.752],
-            [0.5, -0.35, 0.201],
-            [0.5, -0.35, 0.602],
-            [-0.75, -0.575, 1.003], # Top cube
-        ]
-        collision_orientations = [
-            [0, 0, 0.5],
-            [0, 0, 0.2],
-            [0, 0, 0],
-            # [0, 0, 1],
-            [0, 0, 0],
-            # [0, 0, 0],
-            [0, 0, 0.25],
-            [0, 0, 0.5],
-            [0, 0, 0],
-        ]
-        collision_scales = [0.5, 0.25, 0.5, 0.5, 0.4, 0.4, 1.0]
-
-        # Having colorful cubes
-        colors = [
-        [1, 0, 0, 1],   # red
-        [0, 1, 0, 1],   # green
-        [0, 0, 1, 1],   # blue
-        # [1, 1, 0, 1],   # yellow
-        [1, 0, 1, 1],   # magenta
-        # [0, 0, 0, 1],   # black
-        [0, 1, 1, 1],   # cyan
-        [0.8, 0.4, 0, 1], # orange
-        [0, 0.5, 0.5, 1],   # teal
-        ]
+    collision_positions, collision_orientations, collision_scales, colors = get_env(env)
 
     for i in range(len(collision_positions)):
         uid = p.loadURDF(
@@ -282,7 +215,7 @@ if __name__ == "__main__":
             baseOrientation=p.getQuaternionFromEuler(collision_orientations[i]),
             globalScaling=collision_scales[i]
         )
-        p.changeVisualShape(uid, -1, rgbaColor=base_colors[i % len(base_colors)])
+        p.changeVisualShape(uid, -1, rgbaColor=colors[i])
         collision_ids.append(uid)
 
     # Define 6-DOF Goal Positions
@@ -291,7 +224,15 @@ if __name__ == "__main__":
     # We will create a "mirror" motion or synchronized motion.
     
     # Single arm goals from original code
-    single_goals = [
+    left_arm_goals = [
+        [2.54, 1.0, -0.15],
+        [-1.79, 0.15, -0.15],
+        [1.5, 2.15, -0.15],
+        [1.8, 0.2, -0.15],
+        [2.04, 0.15, -0.15],
+    ]
+
+    right_arm_goals = [
         [-2.54, 0.15, -0.15],
         [-1.79, 0.15, -0.15],
         [0.5, 0.15, -0.15],
@@ -300,12 +241,12 @@ if __name__ == "__main__":
     ]
     
     goal_positions = []
-    for g in single_goals:
+    for i in range(len(left_arm_goals)):
         # Construct a 6D goal. 
         # Left arm does 'g'. Right arm does 'g' (but mirrored logic might be needed depending on coord system).
         # For simplicity, let's just apply 'g' to both.
         # Since the right arm is mounted differently, 'g' might look different, but it's valid joint space.
-        full_goal = g + g 
+        full_goal = left_arm_goals[i] + right_arm_goals[i]
         goal_positions.append(full_goal)
 
     print("Checking validity of goal positions...")
@@ -332,7 +273,12 @@ if __name__ == "__main__":
         exit()
         
     goal_positions = valid_goals
-    
+    # Mark the goal configurations
+    mid_point = len(movable_joints) // 2
+    left_ee_idx = movable_joints[mid_point - 1]
+    right_ee_idx = movable_joints[-1]
+
+    mark_goal_configurations_dual(arm_id, movable_joints, goal_positions, left_ee_idx, right_ee_idx)
     # Reset robot to the first valid goal to start
     for i, joint_idx in enumerate(movable_joints):
         p.resetJointState(arm_id, joint_idx, goal_positions[0][i])
@@ -345,20 +291,13 @@ if __name__ == "__main__":
     # Path container - initialized with start position
     path_saved = np.array([goal_positions[0]])
 
-    # ---------------------------------------------------------
-    # 5. Initialize SDF and Planner
-    # ---------------------------------------------------------
+    # Initialize SDF and Planner
     
     # Set robot to start position
     for i, joint_idx in enumerate(movable_joints):
         p.resetJointState(arm_id, joint_idx, goal_positions[0][i])
         
     sdf_env = make_pybullet_env_sdf(collision_ids, max_distance=5.5, probe_radius=0.01)
-
-    # Optional: Visualizing the start spheres
-    visualize_spherical_robot(
-        arm_id, goal_positions[0], ROBOT_SPHERES, movable_joints, color=[1, 0, 0, 0.4]
-    )
 
     # Planning Loop
     for i in range(len(goal_positions) - 1):
@@ -394,14 +333,11 @@ if __name__ == "__main__":
 
     # Execution Loop
     print(f"\nExecuting path with {len(path_saved)} total waypoints...")
+    live_sphere_ids = create_visual_spheres(ROBOT_SPHERES, color=[0, 1, 0, 0.1])
     
     for waypoint in path_saved:
-        # Move to next waypoint
-        # waypoint is length 6
-        
         while True:
             # Get current joint positions (ground truth)
-            # We map the movable_joints indices to the result list
             true_joint_positions = []
             for j_idx in movable_joints:
                 s = p.getJointState(arm_id, j_idx)
@@ -424,20 +360,26 @@ if __name__ == "__main__":
                     / dist
                 )                    
 
-                # Apply velocities to the specific movable joints
+                # Apply velocities
                 for k, v in enumerate(velocities):
                     p.setJointMotorControl2(
                         bodyIndex=arm_id,
-                        jointIndex=movable_joints[k], # Map index k back to PyBullet joint index
+                        jointIndex=movable_joints[k],
                         controlMode=p.VELOCITY_CONTROL,
                         targetVelocity=v,
                     )
             
+            # Step the physics
             p.stepSimulation()
-            # time.sleep(1.0 / 240.0) # Uncomment for real-time speed
+            
+            # 2. Update the sphere positions every frame
+            update_visual_spheres(arm_id, live_sphere_ids, ROBOT_SPHERES)
+            
+            # Sleep to match visualization speed (approx 240Hz)
+            time.sleep(1.0 / 240.0)
 
     print("Path execution complete.")
-    # Keep window open
     while p.isConnected():
         p.stepSimulation()
+        update_visual_spheres(arm_id, live_sphere_ids, ROBOT_SPHERES) # Keep updating if you drag the robot with mouse
         time.sleep(0.1)

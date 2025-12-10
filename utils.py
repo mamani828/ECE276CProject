@@ -241,7 +241,7 @@ def is_state_valid(robot_id, joint_indices, q_target, obstacle_ids, check_self=T
         contacts = p.getContactPoints(bodyA=robot_id, bodyB=obs_id)
         if len(contacts) > 0:
             is_valid = False
-            # print(f"Collision detected with obstacle ID {obs_id}")
+            print(f"Collision detected with obstacle ID {obs_id}")
             break
             
     # 5. Check Self-Collision (Robot vs Robot)
@@ -263,7 +263,7 @@ def is_state_valid(robot_id, joint_indices, q_target, obstacle_ids, check_self=T
                 break
         
         if real_self_collision:
-            # print(f"Self-collision detected between link {link_a} and {link_b}")
+            print(f"Self-collision detected between link {link_a} and {link_b}")
             is_valid = False
 
     # 6. Restore original state
@@ -271,3 +271,79 @@ def is_state_valid(robot_id, joint_indices, q_target, obstacle_ids, check_self=T
         p.resetJointState(robot_id, j_idx, current_states[i])
         
     return is_valid
+
+def mark_goal_configurations_dual(robot_id, movable_joints, goal_configs, left_ee_idx, right_ee_idx):
+    """
+    Takes GOAL CONFIGURATIONS (Joint Angles), calculates where the EEs will be,
+    and places static visual markers there.
+    """
+    # Colors: Cyan for Left, Magenta for Right
+    c_left = [0, 1, 1, 0.8]   
+    c_right = [1, 0, 1, 0.8]  
+
+    print(f"\n--- Visualizing {len(goal_configs)} Goal Configurations ---")
+    
+    # Save current state to restore later
+    current_states = [p.getJointState(robot_id, j)[0] for j in movable_joints]
+
+    for i, q_goal in enumerate(goal_configs):
+        # 1. Teleport robot to this goal configuration
+        for k, j_idx in enumerate(movable_joints):
+            p.resetJointState(robot_id, j_idx, q_goal[k])
+        
+        # 2. Force update of link transforms
+        p.performCollisionDetection()
+
+        # 3. Get EE positions (World coordinates)
+        pos_left = p.getLinkState(robot_id, left_ee_idx)[0]
+        pos_right = p.getLinkState(robot_id, right_ee_idx)[0]
+
+        # 4. Create Markers
+        # Left Marker (Cyan)
+        v_l = p.createVisualShape(p.GEOM_SPHERE, radius=0.05, rgbaColor=c_left)
+        p.createMultiBody(baseVisualShapeIndex=v_l, basePosition=pos_left)
+
+        # Right Marker (Magenta)
+        v_r = p.createVisualShape(p.GEOM_SPHERE, radius=0.05, rgbaColor=c_right)
+        p.createMultiBody(baseVisualShapeIndex=v_r, basePosition=pos_right)
+        
+        print(f"  Goal {i} (Config Space) results in: L={np.round(pos_left, 2)} R={np.round(pos_right, 2)}")
+
+    # Restore original state
+    for k, j_idx in enumerate(movable_joints):
+        p.resetJointState(robot_id, j_idx, current_states[k])
+
+def mark_goal_configurations(robot_id, movable_joints, goal_configs, ee_idx):
+    """
+    Takes GOAL CONFIGURATIONS (Joint Angles), calculates where the EEs will be,
+    and places static visual markers there.
+    """
+    # Colors: Cyan for EE
+    c_ee = [0, 1, 1, 0.8] 
+
+    print(f"\n--- Visualizing {len(goal_configs)} Goal Configurations ---")
+    
+    # Save current state to restore later
+    current_states = [p.getJointState(robot_id, j)[0] for j in movable_joints]
+
+    for i, q_goal in enumerate(goal_configs):
+        # 1. Teleport robot to this goal configuration
+        for k, j_idx in enumerate(movable_joints):
+            p.resetJointState(robot_id, j_idx, q_goal[k])
+        
+        # 2. Force update of link transforms
+        p.performCollisionDetection()
+
+        # 3. Get EE positions (World coordinates)
+        pos_ee = p.getLinkState(robot_id, ee_idx)[0]
+
+        # 4. Create Markers
+        # EE Marker (Cyan)
+        v_ee = p.createVisualShape(p.GEOM_SPHERE, radius=0.05, rgbaColor=c_ee)
+        p.createMultiBody(baseVisualShapeIndex=v_ee, basePosition=pos_ee)
+        
+        print(f"  Goal {i} (Config Space) results in: EE={np.round(pos_ee, 2)}")
+
+    # Restore original state
+    for k, j_idx in enumerate(movable_joints):
+        p.resetJointState(robot_id, j_idx, current_states[k])

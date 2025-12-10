@@ -49,6 +49,10 @@ def make_pybullet_env_sdf(obstacle_ids, max_distance=5.0, probe_radius=1e-3):
                 bodyA=probe_body, bodyB=obs_id, distance=max_distance
             )
 
+            # If no closest points are found, continue to the next obstacle
+            if cps is None:
+                continue
+
             for cp in cps:
                 # cp[8] is contactDistance:
                 #   > 0 when separated

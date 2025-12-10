@@ -10,8 +10,8 @@ from useful_code import *
 from matplotlib import pyplot as plt
 from sdf import make_pybullet_env_sdf, visualize_sdf_slice
 from envs import get_env
+from utils import mark_goal_configurations
 
-# Main Code
 def create_visual_spheres(spheres, color=[1, 0, 0, 0.4]):
     """
     Creates visual-only sphere bodies in PyBullet.
@@ -200,6 +200,8 @@ if __name__ == "__main__":
     path_saved = np.array([[-2.54, 0.15, -0.15]])  # Start at the first goal position
 
     # Run the simulation and move the robot along the saved path
+    # Mark the goal configurations
+    mark_goal_configurations(arm_id, [0, 1, 2], goal_positions, 2)
     # Set the initial joint positions
     for joint_index, joint_pos in enumerate(goal_positions[0]):
         p.resetJointState(arm_id, joint_index, joint_pos)
