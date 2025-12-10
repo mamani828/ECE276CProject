@@ -188,9 +188,9 @@ if __name__ == "__main__":
     goal_positions = [
         [-2.54, 0.15, -0.15],
         [-1.79, 0.15, -0.15],
-        [0.5, 0.15, -0.15],
-        [1.7, 0.2, -0.15],
-        [-2.54, 0.15, -0.15],
+        #[0.5, 0.15, -0.15],
+        #[1.7, 0.2, -0.15],
+       # [-2.54, 0.15, -0.15],
     ]
 
     # Joint Limits of the Robot
@@ -291,6 +291,9 @@ if __name__ == "__main__":
     # Move through the waypoints
     print(f"Number of nodes {len(rrt_planner.node_list)}")
     live_sphere_ids = create_visual_spheres(ROBOT_SPHERES, color=[0, 1, 0, 0.3])
+    
+    for joint_index, joint_pos in enumerate(goal_positions[0]):
+        p.resetJointState(arm_id, joint_index, joint_pos)
     for waypoint in path_saved:
         # "move" to next waypoints
         for joint_index, joint_pos in enumerate(waypoint):
