@@ -237,6 +237,15 @@ class RRT_CBF:
             if check_node_collision(self.robot_id, self.obstacle_ids, self.joint_indices, q_new):
                 continue
 
+            # Reject new node if the edge is colliding
+            if check_edge_collision(
+                self.robot_id, 
+                self.obstacle_ids,
+                nearest.joint_angles,
+                q_new,
+            ):
+                continue
+
             new_node = Node(q_new)
             new_node.parent = nearest
             self.node_list.append(new_node)

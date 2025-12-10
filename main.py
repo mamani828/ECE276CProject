@@ -148,7 +148,8 @@ if __name__ == "__main__":
     env = "complex"
 
     # Initialize PyBullet
-    p.connect(p.GUI)
+    # p.connect(p.GUI)
+    p.connect(p.DIRECT)
     p.setAdditionalSearchPath(pybullet_data.getDataPath())  # For default URDFs
     p.setGravity(0, 0, -9.8)
 
@@ -188,9 +189,8 @@ if __name__ == "__main__":
     goal_positions = [
         [-2.54, 0.15, -0.15],
         [-1.79, 0.15, -0.15],
-        #[0.5, 0.15, -0.15],
-        #[1.7, 0.2, -0.15],
-       # [-2.54, 0.15, -0.15],
+        [0.5, 0.15, -0.15],
+        [1.7, 0.2, -0.15],
     ]
 
     # Joint Limits of the Robot
@@ -226,11 +226,12 @@ if __name__ == "__main__":
             max_iter=5000,
             step_size=0.5,
             alpha=50.0,
-            d_safe=0.1,
+            d_safe=0.15,
         )
         path_segment = (
             rrt_planner.plan()
-        )  # change to plan2() for RRT*, it runs at max iteration so it will take a bit but will give great paths
+        )
+        
         # rrt_planner = RRT(q_start, q_goal, arm_id, collision_ids, joint_limits,
         #                     max_iter=5000,
         #                     step_size=0.5)
@@ -254,7 +255,7 @@ if __name__ == "__main__":
 
     # Generate and Apply Noise
     # Adjust these standard deviations to control noise magnitude
-    noise_std = 0.01
+    noise_std = 0.05
     for xy_key, indices in stack_groups.items():
         # Generate ONE noise vector for this specific stack/location
         # This ensures all cubes in a stack move together
@@ -330,6 +331,13 @@ if __name__ == "__main__":
                 # )
                 # Take a simulation step
                 p.stepSimulation()
+                # We check contact against ALL collision_ids (cubes + ground)
+                for obj_id in collision_ids:
+                    # getContactPoints returns a list if contact exists, None otherwise
+                    contacts = p.getContactPoints(bodyA=arm_id, bodyB=obj_id)
+                    if contacts:
+                        print(f"Collision detected with obstacle ID {obj_id}")
+                        exit()
                 # Update the visual spheres to the current robot state
                 update_visual_spheres(arm_id, live_sphere_ids, ROBOT_SPHERES)
         time.sleep(1.0 / 240.0)
