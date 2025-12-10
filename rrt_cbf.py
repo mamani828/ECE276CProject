@@ -194,7 +194,7 @@ class RRT_CBF:
                 break
         return u
 
-    def step(self, q_from, q_to, num_substeps=5):
+    def step(self, q_from, q_to, num_substeps=10):
         """
         Step from q_from to q_to, that should
         (a) return the q_to if it is within the self.step_size or

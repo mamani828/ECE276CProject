@@ -145,7 +145,7 @@ def make_link_spheres_from_fk(
 
 if __name__ == "__main__":
     # Problem setup
-    env = "simple"
+    env = "complex"
 
     # Initialize PyBullet
     p.connect(p.GUI)
@@ -254,15 +254,13 @@ if __name__ == "__main__":
 
     # Generate and Apply Noise
     # Adjust these standard deviations to control noise magnitude
-    noise_std_pos = 0.05   # ~5cm variance
-    noise_std_yaw = 0.1    # ~5.7 degrees variance
-
+    noise_std = 0.01
     for xy_key, indices in stack_groups.items():
         # Generate ONE noise vector for this specific stack/location
         # This ensures all cubes in a stack move together
-        dx = random.gauss(0, noise_std_pos)
-        dy = random.gauss(0, noise_std_pos)
-        d_yaw = random.gauss(0, noise_std_yaw)
+        dx = random.gauss(0, noise_std)
+        dy = random.gauss(0, noise_std)
+        d_yaw = random.gauss(0, noise_std)
 
         for idx in indices:
             # Retrieve original hardcoded values
@@ -289,6 +287,7 @@ if __name__ == "__main__":
 
             # Apply the transform
             p.resetBasePositionAndOrientation(body_id, new_pos, new_quat)
+
     # Move through the waypoints
     print(f"Number of nodes {len(rrt_planner.node_list)}")
     live_sphere_ids = create_visual_spheres(ROBOT_SPHERES, color=[0, 1, 0, 0.3])

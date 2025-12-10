@@ -331,6 +331,54 @@ if __name__ == "__main__":
             print(f"RRT found path with {len(path_segment)} waypoints")
             path_saved = np.vstack((path_saved, path_segment[1:]))
 
+    # Applying noise to the environment
+    # Adding noise to the environment
+    stack_groups = {}
+    for idx, pos in enumerate(collision_positions):
+        # Rounding prevents floating point errors from separating stacked items
+        xy_key = (round(pos[0], 3), round(pos[1], 3))
+        if xy_key not in stack_groups:
+            stack_groups[xy_key] = []
+        stack_groups[xy_key].append(idx)
+
+    # Generate and Apply Noise
+    # Adjust these standard deviations to control noise magnitude
+    noise_std_pos = 0.05   # ~5cm variance
+    noise_std_yaw = 0.1    # ~5.7 degrees variance
+
+    for xy_key, indices in stack_groups.items():
+        # Generate ONE noise vector for this specific stack/location
+        # This ensures all cubes in a stack move together
+        dx = random.gauss(0, noise_std_pos)
+        dy = random.gauss(0, noise_std_pos)
+        d_yaw = random.gauss(0, noise_std_yaw)
+
+        for idx in indices:
+            # Retrieve original hardcoded values
+            orig_pos = collision_positions[idx]
+            orig_euler = collision_orientations[idx]
+
+            # Calculate new position (Preserve Z)
+            new_pos = [
+                orig_pos[0] + dx, 
+                orig_pos[1] + dy, 
+                orig_pos[2]
+            ]
+
+            # Calculate new orientation (Add noise only to Yaw/Z-rotation)
+            new_euler = [
+                orig_euler[0], 
+                orig_euler[1], 
+                orig_euler[2] + d_yaw
+            ]
+            new_quat = p.getQuaternionFromEuler(new_euler)
+
+            # Map index to pybullet body ID (collision_ids[0] is ground, so +1)
+            body_id = collision_ids[idx + 1]
+
+            # Apply the transform
+            p.resetBasePositionAndOrientation(body_id, new_pos, new_quat)
+    
     # Execution Loop
     print(f"\nExecuting path with {len(path_saved)} total waypoints...")
     live_sphere_ids = create_visual_spheres(ROBOT_SPHERES, color=[0, 1, 0, 0.1])
