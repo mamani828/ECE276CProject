@@ -159,7 +159,9 @@ if __name__ == "__main__":
     env = "simple"
 
     # Initialize PyBullet
-    p.connect(p.GUI)
+    # p.connect(p.GUI)
+    # For Mac this will run faster
+    p.connect(p.DIRECT)
     p.setAdditionalSearchPath(pybullet_data.getDataPath())
     p.setGravity(0, 0, -9.8)
 
@@ -379,7 +381,10 @@ if __name__ == "__main__":
 
     # Create visualization spheres
     live_sphere_ids = create_visual_spheres(ROBOT_SPHERES, color=[0, 1, 0, 0.1])
-    
+    # Thresholds
+    execution_speed = 0.5   # Max speed
+    arrival_tolerance = 0.05 # Distance to accept waypoint
+
     for waypoint_idx, waypoint in enumerate(path_saved):
         # We loop until we are close enough to the CURRENT waypoint
         while True:
@@ -404,11 +409,10 @@ if __name__ == "__main__":
             # Calculate velocity vector
             # Scale the displacement vector to have magnitude 'execution_speed'
             # or less if we are very close.
-            velocities = (
-                min(dist, execution_speed) 
-                * displacement_to_waypoint 
-                / dist
-            )                    
+            # velocities = [0.1] * len(movable_joints)
+
+            target_speed = min(execution_speed, dist * 2.0) 
+            velocities = (displacement_to_waypoint / dist) * target_speed       
 
             # Apply velocities to all joints
             for k, v in enumerate(velocities):
@@ -425,7 +429,12 @@ if __name__ == "__main__":
             
             # Update visualization
             update_visual_spheres(arm_id, live_sphere_ids, ROBOT_SPHERES)
-            
+            for obj_id in collision_ids:
+                    # getContactPoints returns a list if contact exists, None otherwise
+                    contacts = p.getContactPoints(bodyA=arm_id, bodyB=obj_id)
+                    if contacts:
+                        print(f"Collision detected with obstacle ID {obj_id}")
+                        exit()
             # Sleep to keep viz readable
             time.sleep(1.0 / 240.0)
 

@@ -303,11 +303,7 @@ if __name__ == "__main__":
                     break
                 else:
                     # calculate the "velocity" to reach the next waypoint
-                    velocities = (
-                        np.min((np.linalg.norm(displacement_to_waypoint), max_speed))
-                        * displacement_to_waypoint
-                        / np.linalg.norm(displacement_to_waypoint)
-                    )                    
+                    velocities = [0.5] * 3                  
 
                     for joint_index, velocity in enumerate(velocities):
                         p.setJointMotorControl2(

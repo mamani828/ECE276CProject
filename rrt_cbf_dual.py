@@ -29,6 +29,14 @@ def check_node_collision(robot_id, object_ids, joint_indices, joint_position, di
             if contact_points:
                 return True
 
+    # Check Self-Collision (New Logic)
+    # We ask PyBullet for contact points where bodyA=robot AND bodyB=robot
+    # Note: This requires the URDF to not have 'collision ignore' set between these specific links,
+    # or requires custom logic to ignore adjacent links (like shoulder-to-upper-arm).
+    self_contacts = p.getContactPoints(bodyA=robot_id, bodyB=robot_id)
+    if self_contacts:
+        return True
+
     return False
 
 class Node:
@@ -254,7 +262,6 @@ class RRT_CBF:
 
             if check_node_collision(self.robot_id, self.obstacle_ids, self.joint_indices, q_new):
                 continue
-
 
             new_node = Node(q_new)
             new_node.parent = nearest
