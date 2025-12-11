@@ -64,9 +64,8 @@ def update_visual_spheres(robot_id, sphere_body_ids, spheres):
         
         # Transform: World = Link_Pos + Rotation * Local_Pos
         world_pos = pos + rot @ local_pos
-        
-        # Teleport sphere
-        p.resetBasePositionAndOrientation(sphere_body_ids[i], basePosition=world_pos, baseOrientation=[0, 0, 0, 1])
+
+        p.resetBasePositionAndOrientation(sphere_body_ids[i], world_pos, [0, 0, 0, 1])
 
 
 def get_link_axis_and_length(robot_id, link_index, q_ref=None):
@@ -220,17 +219,17 @@ if __name__ == "__main__":
 
     # Define 6-DOF Goal Positions
     left_arm_goals = [
-        [2.54, 1.0, -0.15],
-        [1.79, 0.15, -0.15],
-        [1.5, 2.15, -0.15],
-        [1.9, 0.2, -0.15],
+        [2.347, 1.058, -1.553],
+        [0.727, 1.256, -1.289],
+        [-0.066, 1.421, -1.487],
+        [2.347, 1.058, -1.553],
     ]
 
     right_arm_goals = [
-        [-2.54, 0.15, 0.25],
-        [-1.79, 0.5, 0.25],
-        [-0.5, 0.15, 0.25],
-        [-1.7, 0.2, 0.25],
+        [-1.289, 1.223, -1.322],
+        [-0.331, 1.223, -0.264],
+        [2.347, 0.727, -0.496],
+        [-1.289, 1.223, -1.322],
     ]
     
     goal_positions = []
@@ -267,9 +266,16 @@ if __name__ == "__main__":
         
     goal_positions = valid_goals
     # Mark the goal configurations
-    mid_point = len(movable_joints) // 2
-    left_ee_idx = movable_joints[mid_point - 1]
-    right_ee_idx = movable_joints[-1]
+    def get_joint_index_by_name(robot_id, name):
+        for i in range(p.getNumJoints(robot_id)):
+            info = p.getJointInfo(robot_id, i)
+            joint_name = info[1].decode("utf-8")
+            if joint_name == name:
+                return i
+        return -1
+
+    left_ee_idx = get_joint_index_by_name(arm_id, "ee_joint_left")
+    right_ee_idx = get_joint_index_by_name(arm_id, "ee_joint_right")
 
     mark_goal_configurations_dual(arm_id, movable_joints, goal_positions, left_ee_idx, right_ee_idx)
     # Reset robot to the first valid goal to start
@@ -310,6 +316,7 @@ if __name__ == "__main__":
             sdf_env,
             ROBOT_SPHERES,
             joint_indices=movable_joints, # PASS ALL 6 INDICES
+            ee_indices=[left_ee_idx, right_ee_idx],
             max_iter=5000,
             step_size=0.3, # Reduced step size slightly for higher dim space stability
             alpha=50.0,
@@ -362,9 +369,19 @@ if __name__ == "__main__":
     
     # Execution Loop
     print(f"\nExecuting path with {len(path_saved)} total waypoints...")
+    
+    # 1. Reset Robot to the START of the path
+    # This ensures we don't start from the END position of the last planning segment
+    print("Resetting robot to start configuration...")
+    start_config = path_saved[0]
+    for i, j_idx in enumerate(movable_joints):
+        p.resetJointState(arm_id, j_idx, start_config[i])
+
+    # Create visualization spheres
     live_sphere_ids = create_visual_spheres(ROBOT_SPHERES, color=[0, 1, 0, 0.1])
     
-    for waypoint in path_saved:
+    for waypoint_idx, waypoint in enumerate(path_saved):
+        # We loop until we are close enough to the CURRENT waypoint
         while True:
             # Get current joint positions (ground truth)
             true_joint_positions = []
@@ -373,38 +390,43 @@ if __name__ == "__main__":
                 true_joint_positions.append(s[0])
             true_joint_positions = np.array(true_joint_positions)
             
-            # Displacement in 6D
+            # Displacement vector in 6D
             displacement_to_waypoint = waypoint - true_joint_positions
             dist = np.linalg.norm(displacement_to_waypoint)
             
-            max_speed = 0.05
+            # Thresholds
+            execution_speed = 0.5   # How fast the robot moves (rad/s)
+            arrival_tolerance = 0.02 # How close we must be to move to next waypoint
             
-            if dist < max_speed:
-                break
-            else:
-                # Calculate velocity vector
-                velocities = (
-                    np.min((dist, max_speed))
-                    * displacement_to_waypoint
-                    / dist
-                )                    
+            if dist < arrival_tolerance:
+                break # Reached waypoint, move to next
+            
+            # Calculate velocity vector
+            # Scale the displacement vector to have magnitude 'execution_speed'
+            # or less if we are very close.
+            velocities = (
+                min(dist, execution_speed) 
+                * displacement_to_waypoint 
+                / dist
+            )                    
 
-                # Apply velocities
-                for k, v in enumerate(velocities):
-                    p.setJointMotorControl2(
-                        bodyIndex=arm_id,
-                        jointIndex=movable_joints[k],
-                        controlMode=p.VELOCITY_CONTROL,
-                        targetVelocity=v,
-                    )
+            # Apply velocities to all joints
+            for k, v in enumerate(velocities):
+                p.setJointMotorControl2(
+                    bodyIndex=arm_id,
+                    jointIndex=movable_joints[k],
+                    controlMode=p.VELOCITY_CONTROL,
+                    targetVelocity=v,
+                    force=500 # Ensure sufficient force is applied
+                )
             
-            # Step the physics
+            # Step physics
             p.stepSimulation()
             
-            # 2. Update the sphere positions every frame
+            # Update visualization
             update_visual_spheres(arm_id, live_sphere_ids, ROBOT_SPHERES)
             
-            # Sleep to match visualization speed (approx 240Hz)
+            # Sleep to keep viz readable
             time.sleep(1.0 / 240.0)
 
     print("Path execution complete.")

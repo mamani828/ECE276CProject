@@ -48,6 +48,7 @@ class RRT_CBF:
         env_sdf,
         spheres,
         joint_indices,
+        ee_indices,
         max_iter=10000,
         step_size=0.5,
         alpha=10.0,
@@ -61,6 +62,7 @@ class RRT_CBF:
         self.env_sdf = env_sdf
         self.spheres = spheres
         self.joint_indices = joint_indices
+        self.ee_indices = ee_indices
         self.dt = 0.05
         self.u_max = 1.0
         self.max_iter = max_iter
@@ -72,12 +74,9 @@ class RRT_CBF:
         self.dim = len(q_start)
         self.q_start.cost = 0.0
 
-        # --- UPDATE: Determine EE indices dynamically for dual arm ---
+        # Determine EE indices dynamically for dual arm
         # Assuming standard setup: joint_indices are [L1, L2, L3, R1, R2, R3]
         mid_point = len(joint_indices) // 2
-        # Use the last joint of the first half (Left EE) and last joint of second half (Right EE)
-        self.ee_indices = [joint_indices[mid_point - 1], joint_indices[-1]]
-
 
     def _set_robot_config(self, q):
         """Reset PyBullet joint states to configuration q."""
@@ -202,21 +201,36 @@ class RRT_CBF:
         return q
 
     def _visualize_edge(self, q_from, q_to):
-        """Helper to plot edges for ALL end effectors."""
-        # We iterate over the identified EE indices (Left and Right)
-        # Colors: Green for Left, Yellow (or generic) for Right to distinguish slightly
-        colors = [[0, 1, 0], [1, 1, 0]] 
+        """
+        Manually computes FK for both configurations and draws lines for ALL end effectors.
+        This ensures correct joint mapping.
+        """
+        # Colors: Green for Left EE, Yellow for Right EE
+        colors = [[0, 1, 0], [1, 1, 0]]
         
-        for k, ee_idx in enumerate(self.ee_indices):
+        # 1. Get positions at q_from
+        self._set_robot_config(q_from)
+        pos_from = []
+        for ee_idx in self.ee_indices:
+            state = p.getLinkState(self.robot_id, ee_idx, computeForwardKinematics=True)
+            pos_from.append(state[4]) # Index 4 is Link World Position
+            
+        # 2. Get positions at q_to
+        self._set_robot_config(q_to)
+        pos_to = []
+        for ee_idx in self.ee_indices:
+            state = p.getLinkState(self.robot_id, ee_idx, computeForwardKinematics=True)
+            pos_to.append(state[4])
+
+        # 3. Draw Lines
+        for k in range(len(self.ee_indices)):
             c = colors[k % len(colors)]
-            plot_rrt_edge(
-                robot_id=self.robot_id,
-                q_from=q_from,
-                q_to=q_to,
-                ee_link_index=ee_idx,
-                line_color=c,
-                line_width=1,
-                duration=0,
+            p.addUserDebugLine(
+                lineFromXYZ=pos_from[k],
+                lineToXYZ=pos_to[k],
+                lineColorRGB=c,
+                lineWidth=1,
+                lifeTime=0 # 0 means permanent
             )
 
     def plan(self):
@@ -246,7 +260,7 @@ class RRT_CBF:
             new_node.parent = nearest
             self.node_list.append(new_node)
             
-            # --- UPDATE: Draw Edge for BOTH arms ---
+            # Draw Edge for BOTH arms
             self._visualize_edge(nearest.joint_angles, new_node.joint_angles)
 
             # Check if close to goal
@@ -261,7 +275,7 @@ class RRT_CBF:
                     goal_node.parent = new_node
                     self.node_list.append(goal_node)
 
-                    # --- UPDATE: Draw Final Edge ---
+                    # Draw Final Edge
                     self._visualize_edge(new_node.joint_angles, goal_node.joint_angles)
 
                     path = []
