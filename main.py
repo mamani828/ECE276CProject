@@ -8,7 +8,7 @@ from rrt import RRT
 from rrt_cbf import RRT_CBF
 from useful_code import *
 from matplotlib import pyplot as plt
-from sdf import make_pybullet_env_sdf, visualize_sdf_slice
+from sdf import make_pybullet_env_sdf, visualize_sdf_slices
 from envs import get_env
 from utils import mark_goal_configurations
 
@@ -145,10 +145,11 @@ def make_link_spheres_from_fk(
 
 if __name__ == "__main__":
     # Problem setup
-    env = "complex"
+    env = "simple"
 
     # Initialize PyBullet
     # p.connect(p.GUI)
+    # For Mac this will run faster
     p.connect(p.DIRECT)
     p.setAdditionalSearchPath(pybullet_data.getDataPath())  # For default URDFs
     p.setGravity(0, 0, -9.8)
@@ -207,8 +208,7 @@ if __name__ == "__main__":
         p.resetJointState(arm_id, joint_index, joint_pos)
     sdf_env = make_pybullet_env_sdf(collision_ids, max_distance=5.5, probe_radius=0.01)
     
-    # for height in [0.2, 0.4, 0.6, 0.8, 1.0]:
-    #     visualize_sdf_slice(sdf_env, height=height)
+    # visualize_sdf_slices(sdf_env, heights=[0.15, 0.25, 0.35, 0.45, 0.55, 0.65])
 
     for i in range(len(goal_positions) - 1):
         q_start = goal_positions[i]
@@ -223,10 +223,10 @@ if __name__ == "__main__":
             sdf_env,
             ROBOT_SPHERES,
             joint_indices=[0, 1, 2],
-            max_iter=5000,
+            max_iter=10000,
             step_size=0.5,
             alpha=50.0,
-            d_safe=0.15,
+            d_safe=0.1,
         )
         path_segment = (
             rrt_planner.plan()
@@ -253,20 +253,17 @@ if __name__ == "__main__":
             stack_groups[xy_key] = []
         stack_groups[xy_key].append(idx)
 
-    # Generate and Apply Noise
     # Adjust these standard deviations to control noise magnitude
-    noise_std = 0.05
+    noise_std = 0.02
     for xy_key, indices in stack_groups.items():
         # Generate ONE noise vector for this specific stack/location
         # This ensures all cubes in a stack move together
         dx = random.gauss(0, noise_std)
         dy = random.gauss(0, noise_std)
-        d_yaw = random.gauss(0, noise_std)
 
         for idx in indices:
             # Retrieve original hardcoded values
             orig_pos = collision_positions[idx]
-            orig_euler = collision_orientations[idx]
 
             # Calculate new position (Preserve Z)
             new_pos = [
@@ -275,19 +272,13 @@ if __name__ == "__main__":
                 orig_pos[2]
             ]
 
-            # Calculate new orientation (Add noise only to Yaw/Z-rotation)
-            new_euler = [
-                orig_euler[0], 
-                orig_euler[1], 
-                orig_euler[2] + d_yaw
-            ]
-            new_quat = p.getQuaternionFromEuler(new_euler)
-
             # Map index to pybullet body ID (collision_ids[0] is ground, so +1)
             body_id = collision_ids[idx + 1]
 
             # Apply the transform
-            p.resetBasePositionAndOrientation(body_id, new_pos, new_quat)
+            p.resetBasePositionAndOrientation(body_id, new_pos, p.getQuaternionFromEuler(collision_orientations[i]))
+    print("Added noise to the environment")
+    time.sleep(2)
 
     # Move through the waypoints
     print(f"Number of nodes {len(rrt_planner.node_list)}")
@@ -341,6 +332,7 @@ if __name__ == "__main__":
                 # Update the visual spheres to the current robot state
                 update_visual_spheres(arm_id, live_sphere_ids, ROBOT_SPHERES)
         time.sleep(1.0 / 240.0)
-
+    
+    print("Path execution completed successfully!")
     # Disconnect from PyBullet
     p.disconnect()

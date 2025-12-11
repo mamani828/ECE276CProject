@@ -7,6 +7,7 @@ from utils import (
     plot_link_coordinate_frames,
     plot_rrt_edge,
 )
+
 def check_node_collision(robot_id, object_ids, joint_indices, joint_position, distance=0.0):
     """
     Checks for collisions between a robot and a set of objects in PyBullet.
@@ -202,6 +203,9 @@ class RRT_CBF:
         """
         q = np.asarray(q_from, dtype=float)
         q_to = np.asarray(q_to, dtype=float)
+        # Making sure that distance is max step_size
+        if np.linalg.norm(q_to - q) > self.step_size:
+            q_to = q + self.step_size * (q_to - q) / np.linalg.norm(q_to - q)
 
         for _ in range(num_substeps):
             direction = q_to - q
@@ -265,15 +269,6 @@ class RRT_CBF:
                 self.joint_indices,
                 q_new,
                 distance=0.0,  # or self.d_safe
-            ):
-                continue
-
-            # Reject new node if the edge is colliding
-            if check_edge_collision(
-                self.robot_id, 
-                self.obstacle_ids,
-                nearest.joint_angles,
-                q_new,
             ):
                 continue
 

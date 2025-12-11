@@ -1,5 +1,8 @@
+import math
+
 import pybullet as p
 import numpy as np
+
 from matplotlib import pyplot as plt
 
 
@@ -77,9 +80,9 @@ def make_pybullet_env_sdf(obstacle_ids, max_distance=5.0, probe_radius=1e-3):
     return env_sdf
 
 
-def visualize_sdf_slice(
+def visualize_sdf_slices(
     env_sdf,
-    height=0.0,
+    heights,
     x_range=(-3.0, 3.0),
     y_range=(-3.0, 3.0),
     resolution=0.1,
@@ -88,42 +91,54 @@ def visualize_sdf_slice(
     vmax=1.0,
 ):
     """
-    Visualizes a 2D slice of the SDF at a given height (z value).
+    Visualizes multiple 2D slices of the SDF at given heights in a single plot.
+    
     Args:
         env_sdf (function): The SDF function.
-        height (float): The height of the slice.
-        x_range (tuple): The range of x values.
-        y_range (tuple): The range of y values.
-        resolution (float): The resolution of the slice.
-        cmap (str): The colormap to use.
-        vmin (float): The minimum value of the colormap.
-        vmax (float): The maximum value of the colormap.
-    Returns:
-        None.
+        heights (list[float]): A list of z-heights to slice.
+        x_range, y_range, resolution, cmap, vmin, vmax: Visualization parameters.
     """
-
-    import matplotlib.pyplot as plt
+    num_plots = len(heights)
+    
+    # Dynamically calculate grid size (e.g., max 3 columns)
+    cols = 3
+    rows = math.ceil(num_plots / cols)
+    
+    # Create the subplots
+    fig, axes = plt.subplots(rows, cols, figsize=(5 * cols, 4 * rows), constrained_layout=True)
+    axes = axes.flatten() if num_plots > 1 else [axes] # Ensure axes is iterable
 
     x_vals = np.arange(x_range[0], x_range[1], resolution)
     y_vals = np.arange(y_range[0], y_range[1], resolution)
+    
+    # Loop through heights and plot on corresponding axis
+    for i, h in enumerate(heights):
+        ax = axes[i]
+        
+        # Calculate SDF slice
+        sdf_values = np.zeros((len(y_vals), len(x_vals)))
+        for ix, x in enumerate(x_vals):
+            for iy, y in enumerate(y_vals):
+                point = (x, y, h)
+                sdf_values[iy, ix] = env_sdf(point)
+        
+        # Plot
+        im = ax.imshow(
+            sdf_values,
+            extent=(x_range[0], x_range[1], y_range[0], y_range[1]),
+            origin="lower",
+            cmap=cmap,
+            vmin=vmin,
+            vmax=vmax,
+        )
+        ax.set_title(f"Height z={h}")
+        ax.set_xlabel("X")
+        ax.set_ylabel("Y")
 
-    sdf_values = np.zeros((len(y_vals), len(x_vals)))
+    # Hide any empty subplots (if len(heights) isn't a multiple of cols)
+    for j in range(i + 1, len(axes)):
+        axes[j].axis('off')
 
-    for ix, x in enumerate(x_vals):
-        for iy, y in enumerate(y_vals):
-            point = (x, y, height)
-            sdf_values[iy, ix] = env_sdf(point)
-    print(f"min sdf: {np.min(sdf_values)}, max sdf: {np.max(sdf_values)}")
-    plt.imshow(
-        sdf_values,
-        extent=(x_range[0], x_range[1], y_range[0], y_range[1]),
-        origin="lower",
-        cmap=cmap,
-        vmin=vmin,
-        vmax=vmax,
-    )
-    plt.colorbar(label="Signed Distance")
-    plt.title(f"SDF Slice at z={height}")
-    plt.xlabel("X")
-    plt.ylabel("Y")
+    # Add a shared colorbar
+    fig.colorbar(im, ax=axes, orientation='vertical', fraction=0.02, pad=0.04, label="Signed Distance")
     plt.show()
