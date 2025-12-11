@@ -274,76 +274,121 @@ def is_state_valid(robot_id, joint_indices, q_target, obstacle_ids, check_self=T
 
 def mark_goal_configurations_dual(robot_id, movable_joints, goal_configs, left_ee_idx, right_ee_idx):
     """
-    Takes GOAL CONFIGURATIONS (Joint Angles), calculates where the EEs will be,
+    Takes GOAL CONFIGURATIONS (Joint Angles for BOTH arms), calculates where the EEs will be,
     and places static visual markers there.
+    
+    Args:
+        robot_id (int): Body ID.
+        movable_joints (list[int]): Flat list of joint indices for BOTH arms.
+        goal_configs (list[list[float]]): List of configurations (each config must match len(movable_joints)).
+        left_ee_idx (int): Joint index for Left EE tip.
+        right_ee_idx (int): Joint index for Right EE tip.
     """
-    # Colors: Cyan for Left, Magenta for Right
-    c_left = [0, 1, 1, 0.8]   
-    c_right = [1, 0, 1, 0.8]  
+    # Colors: Cyan for Left, Magenta for Right, Black for text
+    c_left = [0, 1, 1, 0.6]   
+    c_right = [1, 0, 1, 0.6]
+    c_text = [0, 0, 0]
 
     print(f"\n--- Visualizing {len(goal_configs)} Goal Configurations ---")
     
     # Save current state to restore later
     current_states = [p.getJointState(robot_id, j)[0] for j in movable_joints]
+    
+    marker_ids = []
 
     for i, q_goal in enumerate(goal_configs):
         # 1. Teleport robot to this goal configuration
+        # q_goal must be a flat list covering all movable_joints (left + right)
         for k, j_idx in enumerate(movable_joints):
             p.resetJointState(robot_id, j_idx, q_goal[k])
         
-        # 2. Force update of link transforms
-        p.performCollisionDetection()
+        # 2. Get EE positions with computeForwardKinematics=True
+        # We need this because we haven't stepped the simulation
+        state_left = p.getLinkState(robot_id, left_ee_idx, computeForwardKinematics=True)
+        state_right = p.getLinkState(robot_id, right_ee_idx, computeForwardKinematics=True)
+        
+        # Use index [4] for the Link Frame (visual mesh origin)
+        pos_left = state_left[4]
+        pos_right = state_right[4]
 
-        # 3. Get EE positions (World coordinates)
-        pos_left = p.getLinkState(robot_id, left_ee_idx)[0]
-        pos_right = p.getLinkState(robot_id, right_ee_idx)[0]
-
-        # 4. Create Markers
+        # 3. Create Markers
         # Left Marker (Cyan)
         v_l = p.createVisualShape(p.GEOM_SPHERE, radius=0.05, rgbaColor=c_left)
-        p.createMultiBody(baseVisualShapeIndex=v_l, basePosition=pos_left)
+        id_l = p.createMultiBody(baseVisualShapeIndex=v_l, basePosition=pos_left)
+        marker_ids.append(id_l)
 
         # Right Marker (Magenta)
         v_r = p.createVisualShape(p.GEOM_SPHERE, radius=0.05, rgbaColor=c_right)
-        p.createMultiBody(baseVisualShapeIndex=v_r, basePosition=pos_right)
+        id_r = p.createMultiBody(baseVisualShapeIndex=v_r, basePosition=pos_right)
+        marker_ids.append(id_r)
         
-        print(f"  Goal {i} (Config Space) results in: L={np.round(pos_left, 2)} R={np.round(pos_right, 2)}")
+        # 4. Add Labels
+        p.addUserDebugText(f"L{i}", [pos_left[0], pos_left[1], pos_left[2]+0.1], c_text)
+        p.addUserDebugText(f"R{i}", [pos_right[0], pos_right[1], pos_right[2]+0.1], c_text)
+        
+        print(f"  Goal {i}: L={np.round(pos_left, 2)} R={np.round(pos_right, 2)}")
 
     # Restore original state
     for k, j_idx in enumerate(movable_joints):
         p.resetJointState(robot_id, j_idx, current_states[k])
+        
+    # Force visual update
+    p.performCollisionDetection()
+    
+    return marker_ids
 
 def mark_goal_configurations(robot_id, movable_joints, goal_configs, ee_idx):
     """
     Takes GOAL CONFIGURATIONS (Joint Angles), calculates where the EEs will be,
     and places static visual markers there.
+    
+    Args:
+        robot_id (int): PyBullet Body ID of the robot.
+        movable_joints (list[int]): Indices of the joints to control (e.g. [0, 1, 2]).
+        goal_configs (list[list[float]]): List of target joint angles.
+        ee_idx (int): The Link Index of the End Effector (Must be the FIXED joint/tip index).
+        
+    Returns:
+        list[int]: A list of body IDs for the created markers (useful for cleanup).
     """
-    # Colors: Cyan for EE
-    c_ee = [0, 1, 1, 0.8] 
+    # Colors: Cyan for EE, Black for Text
+    c_ee = [0, 1, 1, 0.6] 
+    c_text = [0, 0, 0]
 
     print(f"\n--- Visualizing {len(goal_configs)} Goal Configurations ---")
     
     # Save current state to restore later
     current_states = [p.getJointState(robot_id, j)[0] for j in movable_joints]
+    
+    marker_ids = []
 
     for i, q_goal in enumerate(goal_configs):
         # 1. Teleport robot to this goal configuration
         for k, j_idx in enumerate(movable_joints):
             p.resetJointState(robot_id, j_idx, q_goal[k])
         
-        # 2. Force update of link transforms
-        p.performCollisionDetection()
+        # 2. Get EE position with computeForwardKinematics=True
+        # We need this flag because we just teleported the joints without stepping simulation
+        ee_state = p.getLinkState(robot_id, ee_idx, computeForwardKinematics=True)
+        pos_ee = ee_state[4]  # Index 4 is the Link Frame position
 
-        # 3. Get EE positions (World coordinates)
-        pos_ee = p.getLinkState(robot_id, ee_idx)[0]
-
-        # 4. Create Markers
-        # EE Marker (Cyan)
+        # 3. Create Marker (Sphere)
         v_ee = p.createVisualShape(p.GEOM_SPHERE, radius=0.05, rgbaColor=c_ee)
-        p.createMultiBody(baseVisualShapeIndex=v_ee, basePosition=pos_ee)
+        marker_id = p.createMultiBody(baseVisualShapeIndex=v_ee, basePosition=pos_ee)
+        marker_ids.append(marker_id)
         
-        print(f"  Goal {i} (Config Space) results in: EE={np.round(pos_ee, 2)}")
+        # 4. Create Label (Text)
+        # Shift text slightly above the sphere so it's readable
+        text_pos = [pos_ee[0], pos_ee[1], pos_ee[2] + 0.1]
+        p.addUserDebugText(f"Goal {i}", text_pos, c_text, textSize=1.5)
+        
+        print(f"  Goal {i}: EE Position = {np.round(pos_ee, 2)}")
 
-    # Restore original state
+    # Restore original state so the robot snaps back to where it was before calling this
     for k, j_idx in enumerate(movable_joints):
         p.resetJointState(robot_id, j_idx, current_states[k])
+        
+    # Optional: Force a visual update of the robot mesh to the restored state
+    p.performCollisionDetection()
+    
+    return marker_ids
