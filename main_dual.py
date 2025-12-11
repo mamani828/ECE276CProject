@@ -219,23 +219,18 @@ if __name__ == "__main__":
         collision_ids.append(uid)
 
     # Define 6-DOF Goal Positions
-    # Previous single-arm goals were length 3.
-    # We now need length 6: [Left_J1, L_J2, L_J3, Right_J1, R_J2, R_J3]
-    # We will create a "mirror" motion or synchronized motion.
-    
-    # Single arm goals from original code
     left_arm_goals = [
         [2.54, 1.0, -0.15],
-        [-1.79, 0.15, -0.15],
+        [1.79, 0.15, -0.15],
         [1.5, 2.15, -0.15],
-        [1.8, 0.2, -0.15],
+        [1.9, 0.2, -0.15],
     ]
 
     right_arm_goals = [
-        [-2.54, 0.15, -0.15],
-        [-1.79, 0.15, -0.15],
-        [0.5, 0.15, -0.15],
-        [1.7, 0.2, -0.15],
+        [-2.54, 0.15, 0.25],
+        [-1.79, 0.5, 0.25],
+        [-0.5, 0.15, 0.25],
+        [-1.7, 0.2, 0.25],
     ]
     
     goal_positions = []
@@ -329,7 +324,6 @@ if __name__ == "__main__":
             print(f"RRT found path with {len(path_segment)} waypoints")
             path_saved = np.vstack((path_saved, path_segment[1:]))
 
-    # Applying noise to the environment
     # Adding noise to the environment
     stack_groups = {}
     for idx, pos in enumerate(collision_positions):
@@ -339,22 +333,17 @@ if __name__ == "__main__":
             stack_groups[xy_key] = []
         stack_groups[xy_key].append(idx)
 
-    # Generate and Apply Noise
     # Adjust these standard deviations to control noise magnitude
-    noise_std_pos = 0.05   # ~5cm variance
-    noise_std_yaw = 0.1    # ~5.7 degrees variance
-
+    noise_std = 0.02
     for xy_key, indices in stack_groups.items():
         # Generate ONE noise vector for this specific stack/location
         # This ensures all cubes in a stack move together
-        dx = random.gauss(0, noise_std_pos)
-        dy = random.gauss(0, noise_std_pos)
-        d_yaw = random.gauss(0, noise_std_yaw)
+        dx = random.gauss(0, noise_std)
+        dy = random.gauss(0, noise_std)
 
         for idx in indices:
             # Retrieve original hardcoded values
             orig_pos = collision_positions[idx]
-            orig_euler = collision_orientations[idx]
 
             # Calculate new position (Preserve Z)
             new_pos = [
@@ -363,19 +352,13 @@ if __name__ == "__main__":
                 orig_pos[2]
             ]
 
-            # Calculate new orientation (Add noise only to Yaw/Z-rotation)
-            new_euler = [
-                orig_euler[0], 
-                orig_euler[1], 
-                orig_euler[2] + d_yaw
-            ]
-            new_quat = p.getQuaternionFromEuler(new_euler)
-
             # Map index to pybullet body ID (collision_ids[0] is ground, so +1)
             body_id = collision_ids[idx + 1]
 
             # Apply the transform
-            p.resetBasePositionAndOrientation(body_id, new_pos, new_quat)
+            p.resetBasePositionAndOrientation(body_id, new_pos, p.getQuaternionFromEuler(collision_orientations[idx]))
+    print("Added noise to the environment")
+    time.sleep(2)
     
     # Execution Loop
     print(f"\nExecuting path with {len(path_saved)} total waypoints...")

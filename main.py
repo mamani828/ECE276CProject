@@ -276,7 +276,7 @@ if __name__ == "__main__":
             body_id = collision_ids[idx + 1]
 
             # Apply the transform
-            p.resetBasePositionAndOrientation(body_id, new_pos, p.getQuaternionFromEuler(collision_orientations[i]))
+            p.resetBasePositionAndOrientation(body_id, new_pos, p.getQuaternionFromEuler(collision_orientations[idx]))
     print("Added noise to the environment")
     time.sleep(2)
 
