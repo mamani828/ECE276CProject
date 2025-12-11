@@ -148,9 +148,9 @@ if __name__ == "__main__":
     env = "simple"
 
     # Initialize PyBullet
-    # p.connect(p.GUI)
+    p.connect(p.GUI)
     # For Mac this will run faster
-    p.connect(p.DIRECT)
+    # p.connect(p.DIRECT)
     p.setAdditionalSearchPath(pybullet_data.getDataPath())  # For default URDFs
     p.setGravity(0, 0, -9.8)
 
@@ -202,7 +202,7 @@ if __name__ == "__main__":
 
     # Run the simulation and move the robot along the saved path
     # Mark the goal configurations
-    mark_goal_configurations(arm_id, [0, 1, 2], goal_positions, 2)
+    mark_goal_configurations(arm_id, [0, 1, 2], goal_positions, 3)
     # Set the initial joint positions
     for joint_index, joint_pos in enumerate(goal_positions[0]):
         p.resetJointState(arm_id, joint_index, joint_pos)

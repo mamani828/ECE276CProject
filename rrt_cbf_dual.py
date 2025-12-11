@@ -177,6 +177,10 @@ class RRT_CBF:
         q = np.asarray(q_from, dtype=float)
         q_to = np.asarray(q_to, dtype=float)
 
+        # Making sure that distance is max step_size
+        if np.linalg.norm(q_to - q) > self.step_size:
+            q_to = q + self.step_size * (q_to - q) / np.linalg.norm(q_to - q)
+
         for _ in range(num_substeps):
             direction = q_to - q
             L = np.linalg.norm(direction)
@@ -237,14 +241,6 @@ class RRT_CBF:
             if check_node_collision(self.robot_id, self.obstacle_ids, self.joint_indices, q_new):
                 continue
 
-            # Reject new node if the edge is colliding
-            if check_edge_collision(
-                self.robot_id, 
-                self.obstacle_ids,
-                nearest.joint_angles,
-                q_new,
-            ):
-                continue
 
             new_node = Node(q_new)
             new_node.parent = nearest

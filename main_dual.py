@@ -9,7 +9,7 @@ from matplotlib import pyplot as plt
 from rrt import RRT
 from rrt_cbf_dual import RRT_CBF
 from useful_code import *
-from sdf import make_pybullet_env_sdf, visualize_sdf_slice
+from sdf import make_pybullet_env_sdf
 from utils import is_state_valid, mark_goal_configurations_dual
 from envs import get_env
 
@@ -229,7 +229,6 @@ if __name__ == "__main__":
         [-1.79, 0.15, -0.15],
         [1.5, 2.15, -0.15],
         [1.8, 0.2, -0.15],
-        [2.04, 0.15, -0.15],
     ]
 
     right_arm_goals = [
@@ -237,7 +236,6 @@ if __name__ == "__main__":
         [-1.79, 0.15, -0.15],
         [0.5, 0.15, -0.15],
         [1.7, 0.2, -0.15],
-        [-2.54, 0.15, -0.15],
     ]
     
     goal_positions = []
