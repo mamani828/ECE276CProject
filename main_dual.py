@@ -6,7 +6,7 @@ import pybullet_data
 from matplotlib import pyplot as plt
 
 # Assuming these exist in your local directory as before
-from rrt import RRT
+from rrt_dual import RRT
 from rrt_cbf_dual import RRT_CBF
 from useful_code import *
 from sdf import make_pybullet_env_sdf
@@ -157,11 +157,10 @@ def make_link_spheres_from_fk(
 if __name__ == "__main__":
     # Problem setup
     env = "simple"
-
     # Initialize PyBullet
-    # p.connect(p.GUI)
+    p.connect(p.GUI)
     # For Mac this will run faster
-    p.connect(p.DIRECT)
+    # p.connect(p.DIRECT)
     p.setAdditionalSearchPath(pybullet_data.getDataPath())
     p.setGravity(0, 0, -9.8)
 
@@ -309,20 +308,31 @@ if __name__ == "__main__":
         print(f"Start: {np.round(q_start, 2)}")
         print(f"Goal:  {np.round(q_goal, 2)}")
 
-        rrt_planner = RRT_CBF(
+        # rrt_planner = RRT_CBF(
+        #     q_start,
+        #     q_goal,
+        #     arm_id,
+        #     collision_ids,
+        #     joint_limits,
+        #     sdf_env,
+        #     ROBOT_SPHERES,
+        #     joint_indices=movable_joints, # PASS ALL 6 INDICES
+        #     ee_indices=[left_ee_idx, right_ee_idx],
+        #     max_iter=5000,
+        #     step_size=0.3, # Reduced step size slightly for higher dim space stability
+        #     alpha=50.0,
+        #     d_safe=0.1,
+        # )
+        rrt_planner = RRT(
             q_start,
             q_goal,
             arm_id,
             collision_ids,
             joint_limits,
-            sdf_env,
-            ROBOT_SPHERES,
-            joint_indices=movable_joints, # PASS ALL 6 INDICES
-            ee_indices=[left_ee_idx, right_ee_idx],
-            max_iter=5000,
-            step_size=0.3, # Reduced step size slightly for higher dim space stability
-            alpha=50.0,
-            d_safe=0.1,
+            movable_joints,
+            [left_ee_idx, right_ee_idx],
+            max_iter=10000,
+            step_size=0.3,
         )
         
         path_segment = rrt_planner.plan()
@@ -343,7 +353,7 @@ if __name__ == "__main__":
         stack_groups[xy_key].append(idx)
 
     # Adjust these standard deviations to control noise magnitude
-    noise_std = 0.02
+    noise_std = 0.0
     for xy_key, indices in stack_groups.items():
         # Generate ONE noise vector for this specific stack/location
         # This ensures all cubes in a stack move together
