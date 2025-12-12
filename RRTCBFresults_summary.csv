@@ -1,2 +1,0 @@
-noise_std,seed,path_length,num_waypoints,total_nodes,planner_success_rate,collision_rate,success_rate
-0.0088,2.6,13.1947,56.6,149.2,1.0,0.15,0.85
