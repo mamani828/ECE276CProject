@@ -1,5 +1,0 @@
-noise_std,trials,success_rate,planner_success_rate,collision_rate,avg_path_length,avg_num_waypoints,avg_total_nodes
-0.0,5,1.0,1.0,0.0,13.4488,59.2,159.2
-0.005,5,1.0,1.0,0.0,13.537,60.2,157.8
-0.01,5,1.0,1.0,0.0,13.8547,61.6,166.6
-0.02,5,0.8,0.8,0.0,14.1779,51.4,667.0

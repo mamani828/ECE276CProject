@@ -32,6 +32,16 @@ def avg(vals):
     vals = [x for x in vals if not math.isnan(x)]
     return sum(vals)/len(vals) if vals else math.nan
 
+def stdev(vals):
+    """Calculate sample standard deviation."""
+    vals = [x for x in vals if not math.isnan(x)]
+    n = len(vals)
+    if n < 2:
+        return 0.0
+    mean = sum(vals) / n
+    variance = sum((x - mean) ** 2 for x in vals) / (n - 1)
+    return math.sqrt(variance)
+
 def summarize_by_env_noise(rows):
     groups = defaultdict(list)
     for r in rows:
@@ -48,8 +58,17 @@ def summarize_by_env_noise(rows):
         planner_success = sum(1 for r in items if to_bool(r.get("planner_success")))
         collision = sum(1 for r in items if to_bool(r.get("collision")))
         path_len = avg([to_float(r.get("path_length")) for r in items])
-        waypoints = avg([to_int(r.get("num_waypoints")) for r in items])
-        nodes = avg([to_int(r.get("total_nodes")) for r in items])
+        
+        # Get lists for waypoints and nodes
+        waypoints_list = [to_int(r.get("num_waypoints")) for r in items]
+        nodes_list = [to_int(r.get("total_nodes")) for r in items]
+        
+        # Compute Avg and Std
+        waypoints_avg = avg(waypoints_list)
+        waypoints_std = stdev(waypoints_list)
+        nodes_avg = avg(nodes_list)
+        nodes_std = stdev(nodes_list)
+
         plan_time = avg([to_float(r.get("planning_time")) for r in items])
         
         summary = {
@@ -60,8 +79,12 @@ def summarize_by_env_noise(rows):
             "planner_success_rate": round(planner_success/n, 3) if n else math.nan,
             "collision_rate": round(collision/n, 3) if n else math.nan,
             "avg_path_length": round(path_len, 4) if not math.isnan(path_len) else math.nan,
-            "avg_num_waypoints": round(waypoints, 3) if not math.isnan(waypoints) else math.nan,
-            "avg_total_nodes": round(nodes, 3) if not math.isnan(nodes) else math.nan,
+            
+            "avg_num_waypoints": round(waypoints_avg, 3) if not math.isnan(waypoints_avg) else math.nan,
+            "std_num_waypoints": round(waypoints_std, 3),
+            
+            "avg_total_nodes": round(nodes_avg, 3) if not math.isnan(nodes_avg) else math.nan,
+            "std_total_nodes": round(nodes_std, 3),
         }
         if not math.isnan(plan_time):
              summary["avg_planning_time_s"] = round(plan_time, 4)
@@ -86,8 +109,15 @@ def summarize_by_noise(rows):
         planner_success = sum(1 for r in items if to_bool(r.get("planner_success")))
         collision = sum(1 for r in items if to_bool(r.get("collision")))
         path_len = avg([to_float(r.get("path_length")) for r in items])
-        waypoints = avg([to_int(r.get("num_waypoints")) for r in items])
-        nodes = avg([to_int(r.get("total_nodes")) for r in items])
+        
+        waypoints_list = [to_int(r.get("num_waypoints")) for r in items]
+        nodes_list = [to_int(r.get("total_nodes")) for r in items]
+        
+        waypoints_avg = avg(waypoints_list)
+        waypoints_std = stdev(waypoints_list)
+        nodes_avg = avg(nodes_list)
+        nodes_std = stdev(nodes_list)
+        
         plan_time = avg([to_float(r.get("planning_time")) for r in items])
 
         summary = {
@@ -97,8 +127,12 @@ def summarize_by_noise(rows):
             "planner_success_rate": round(planner_success/n, 3) if n else math.nan,
             "collision_rate": round(collision/n, 3) if n else math.nan,
             "avg_path_length": round(path_len, 4) if not math.isnan(path_len) else math.nan,
-            "avg_num_waypoints": round(waypoints, 3) if not math.isnan(waypoints) else math.nan,
-            "avg_total_nodes": round(nodes, 3) if not math.isnan(nodes) else math.nan,
+            
+            "avg_num_waypoints": round(waypoints_avg, 3) if not math.isnan(waypoints_avg) else math.nan,
+            "std_num_waypoints": round(waypoints_std, 3),
+            
+            "avg_total_nodes": round(nodes_avg, 3) if not math.isnan(nodes_avg) else math.nan,
+            "std_total_nodes": round(nodes_std, 3),
         }
         # Add planning time if available
         if not math.isnan(plan_time):
@@ -127,6 +161,11 @@ def summarize_generic(rows):
         vals = [to_float(r.get(fn)) for r in rows]
         m = avg(vals)
         summary[fn] = round(m, 4) if not math.isnan(m) else math.nan
+        # Add std for waypoints and nodes even in generic summary
+        if fn in ["num_waypoints", "total_nodes"]:
+             s = stdev(vals)
+             summary[f"std_{fn}"] = round(s, 3)
+
     for fn in bool_cols:
         cnt = sum(1 for r in rows if to_bool(r.get(fn)))
         summary[f"{fn}_rate"] = round(cnt/len(rows), 3) if rows else math.nan
@@ -160,8 +199,8 @@ def print_table(title, rows):
 def main():
     base = os.path.dirname(os.path.abspath(__file__))
     abl_path = os.path.join(base, "ablation_results.csv")
-    rrtcbf_path = os.path.join(base, "ablation_results_dual_cbf_final.csv")
-    rrt_path = os.path.join(base, "ablation_results_dual_final.csv")
+    rrtcbf_path = os.path.join(base, "RRTCBF_results.csv")
+    rrt_path = os.path.join(base, "RRT_results.csv")
 
     # Ablation summary (env, noise)
     _, abl_rows = read_csv(abl_path)
@@ -184,8 +223,8 @@ def main():
             title = "RRTCBFresults.csv summary (generic)"
             
         print_table(title, rrtcbf_summary)
-        if write_csv(os.path.join(base, "RRTCBFresults_summary_final.csv"), rrtcbf_summary):
-            print("Wrote RRTCBFresults_summary.csv")
+        if write_csv(os.path.join(base, "RRTCBFresults_summary_final_single_complex.csv"), rrtcbf_summary):
+            print("Wrote RRTCBFresults_summary_final_single_complex.csv")
     else:
         print(f"No RRTCBFresults.csv at {rrtcbf_path}")
 
@@ -200,8 +239,8 @@ def main():
             title = "RRTresults.csv summary (generic)"
 
         print_table(title, rrt_summary)
-        if write_csv(os.path.join(base, "RRTresults_summary_final.csv"), rrt_summary):
-            print("Wrote RRTresults_summary.csv")
+        if write_csv(os.path.join(base, "RRTresults_summary_final_single_complex.csv"), rrt_summary):
+            print("Wrote RRTresults_summary_final_single_complex.csv")
     else:
         print(f"No RRTresults.csv at {rrt_path}")
 
