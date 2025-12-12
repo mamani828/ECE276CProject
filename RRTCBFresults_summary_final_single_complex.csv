@@ -1,5 +1,0 @@
-noise_std, trials, success_rate, planner_success_rate, collision_rate, avg_path_length, avg_num_waypoints, std_num_waypoints, avg_total_nodes, std_total_nodes, avg_planning_time_s
-0.0, 5, 1.0, 1.0, 0.0, 9.1168, 25.6, 2.302, 80.4, 13.759, 0.5361
-0.005, 5, 1.0, 1.0, 0.0, 8.8429, 24.8, 3.271, 73.4, 15.209, 0.3849
-0.01, 5, 1.0, 1.0, 0.0, 8.7624, 25.0, 3.742, 73.4, 15.209, 0.3851
-0.02, 5, 1.0, 1.0, 0.0, 8.9749, 25.6, 2.51, 74.4, 13.975, 0.3909
