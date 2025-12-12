@@ -1,17 +1,11 @@
 import numpy as np
 import pybullet as p
-from utils import (
-    get_ee_position,
-    plot_link_coordinate_frames,
-    check_edge_collision,
-    plot_rrt_edge,
-)
+import time
 
 class Node:
     def __init__(self, joint_angles):
-        self.joint_angles = np.array(joint_angles)  # 6D config
+        self.joint_angles = np.array(joint_angles)
         self.parent = None
-        self.cost = 0.0
 
 class RRT:
     def __init__(
@@ -21,14 +15,11 @@ class RRT:
         robot_id,
         obstacle_ids,
         q_limits,
-        joint_indices,
-        ee_indices,
+        joint_indices,  # [L1, L2, L3, R1, R2, R3]
+        ee_indices,     # [Left_Tip, Right_Tip]
         max_iter=10000,
         step_size=0.5,
     ):
-        """
-        RRT Initialization for Dual Arm Robot.
-        """
         self.q_start = Node(q_start)
         self.q_goal = Node(q_goal)
         self.robot_id = robot_id
@@ -36,134 +27,123 @@ class RRT:
         self.q_limits = np.array(q_limits)
         self.joint_indices = joint_indices
         self.ee_indices = ee_indices
-        
         self.max_iter = max_iter
         self.step_size = step_size
+        
         self.node_list = [self.q_start]
 
-        self.dim = len(q_start)
-        self.q_start.cost = 0.0
-
-    def step(self, from_node, to_joint_angles):
-        """Step from "from_node" to "to_joint_angles", that should
-        (a) return the to_joint_angles if it is within the self.step_size or
-        (b) only step so far as self.step_size, returning the new node within that distance
-        """
-        q_from = np.asarray(from_node, dtype=float)
-        q_to = np.asarray(to_joint_angles, dtype=float)
-        if np.linalg.norm(q_to - q_from) >= self.step_size:
-            q_to = q_from + (self.step_size / np.linalg.norm(q_to - q_from)) * (q_to - q_from)
-
-        d = q_to - q_from
-        L = np.linalg.norm(d)
-        if L == 0 or L <= self.step_size:
-            return q_to.copy()
-        q_new = q_from + (self.step_size / L) * d
-        return q_new
+    def step(self, from_config, to_config):
+        """Steer from 'from_config' towards 'to_config' by step_size."""
+        q_from = np.array(from_config)
+        q_to = np.array(to_config)
+        
+        direction = q_to - q_from
+        distance = np.linalg.norm(direction)
+        
+        if distance <= self.step_size:
+            return q_to
+        else:
+            return q_from + (direction / distance) * self.step_size
 
     def get_nearest_node(self, random_point):
-        random_point = np.asarray(random_point, dtype=float)
-        dists = [
-            np.linalg.norm(node.joint_angles - random_point) for node in self.node_list
-        ]
-        return self.node_list[int(np.argmin(dists))]
+        dists = [np.linalg.norm(node.joint_angles - random_point) for node in self.node_list]
+        return self.node_list[np.argmin(dists)]
 
-    def _visualize_edge(self, q_from, q_to):
+    def _check_collision(self, config):
         """
-        Helper to plot edges for BOTH end effectors.
-        Manually computes FK to ensure correct visualization.
+        Explicitly checks collision for a specific configuration.
         """
-        colors = [[0, 1, 0], [1, 1, 0]] # Green (Left), Yellow (Right)
+        # 1. Set Robot Configuration
+        for i, j_idx in enumerate(self.joint_indices):
+            p.resetJointState(self.robot_id, j_idx, config[i])
+        p.performCollisionDetection()
+
+        # 2. Check Environment Collision
+        for obj_id in self.obstacle_ids:
+            if p.getContactPoints(bodyA=self.robot_id, bodyB=obj_id):
+                return True # Collision
+
+        # 3. Check Self Collision (Arm vs Arm)
+        if p.getContactPoints(bodyA=self.robot_id, bodyB=self.robot_id):
+             return True
+
+        return False
+
+    def _check_edge_collision(self, q1, q2, steps=10):
+        """
+        Discretize edge and check collision at each step.
+        """
+        for i in range(steps + 1):
+            t = i / steps
+            q_interp = q1 + (q2 - q1) * t
+            if self._check_collision(q_interp):
+                return True
+        return False
+
+    def _visualize_edge(self, q1, q2):
+        """Draws a line for both End Effectors between q1 and q2."""
+        # 1. Get Start Positions
+        for i, j_idx in enumerate(self.joint_indices):
+            p.resetJointState(self.robot_id, j_idx, q1[i])
         
-        # 1. Get positions at q_from
-        for i, j_idx in enumerate(self.joint_indices):
-            p.resetJointState(self.robot_id, j_idx, q_from[i])
-            
-        pos_from = []
-        for ee_idx in self.ee_indices:
-            state = p.getLinkState(self.robot_id, ee_idx, computeForwardKinematics=True)
-            pos_from.append(state[4]) 
-            
-        # 2. Get positions at q_to
-        for i, j_idx in enumerate(self.joint_indices):
-            p.resetJointState(self.robot_id, j_idx, q_to[i])
-            
-        pos_to = []
-        for ee_idx in self.ee_indices:
-            state = p.getLinkState(self.robot_id, ee_idx, computeForwardKinematics=True)
-            pos_to.append(state[4])
+        pos1 = []
+        for ee in self.ee_indices:
+            state = p.getLinkState(self.robot_id, ee, computeForwardKinematics=True)
+            pos1.append(state[4]) # World pos
 
-        # 3. Draw Lines
+        # 2. Get End Positions
+        for i, j_idx in enumerate(self.joint_indices):
+            p.resetJointState(self.robot_id, j_idx, q2[i])
+            
+        pos2 = []
+        for ee in self.ee_indices:
+            state = p.getLinkState(self.robot_id, ee, computeForwardKinematics=True)
+            pos2.append(state[4])
+
+        # 3. Draw Lines (Green=Left, Yellow=Right)
+        colors = [[0, 1, 0], [1, 1, 0]]
         for k in range(len(self.ee_indices)):
-            c = colors[k % len(colors)]
-            p.addUserDebugLine(
-                lineFromXYZ=pos_from[k],
-                lineToXYZ=pos_to[k],
-                lineColorRGB=c,
-                lineWidth=1,
-                lifeTime=0 
-            )
-
-    def check_collision_custom(self, q1, q2):
-        """
-        Wrapper to call your utility check_edge_collision.
-        Ensure your utility handles self-collision if needed.
-        """
-        # Note: standard check_edge_collision usually takes start/end configs
-        # and discretizes between them.
-        return check_edge_collision(
-            self.robot_id,
-            self.obstacle_ids,
-            q1.tolist(),
-            q2.tolist(),
-            discretization_step=0.05 # Finer step for dual arm safety
-        )
+            p.addUserDebugLine(pos1[k], pos2[k], lineColorRGB=colors[k], lineWidth=1, lifeTime=0)
 
     def plan(self):
-        """Standard RRT Planning Loop"""
         for _ in range(self.max_iter):
             # 1. Sample
             if np.random.rand() < 0.10:
                 q_rand = self.q_goal.joint_angles.copy()
             else:
-                q_rand = np.array(
-                    [np.random.uniform(lo, hi) for (lo, hi) in self.q_limits],
-                    dtype=float,
-                )
+                q_rand = np.random.uniform(self.q_limits[:, 0], self.q_limits[:, 1])
 
             # 2. Nearest
-            nearest = self.get_nearest_node(q_rand)
-
-            # 3. Steer
-            q_new = self.step(nearest.joint_angles, q_rand)
-
-            # 4. Collision Check (Edge)
-            if self.check_collision_custom(nearest.joint_angles, q_new):
-                continue
+            nearest_node = self.get_nearest_node(q_rand)
             
-            # 5. Add to Tree
+            # 3. Steer
+            q_new = self.step(nearest_node.joint_angles, q_rand)
+
+            # 4. Check Edge Collision
+            if self._check_edge_collision(nearest_node.joint_angles, q_new):
+                continue
+
+            # 5. Add Node
             new_node = Node(q_new)
-            new_node.parent = nearest
+            new_node.parent = nearest_node
             self.node_list.append(new_node)
             
             # Visualize
-            self._visualize_edge(nearest.joint_angles, q_new)
+            self._visualize_edge(nearest_node.joint_angles, q_new)
 
             # 6. Check Goal
             if np.linalg.norm(new_node.joint_angles - self.q_goal.joint_angles) <= self.step_size:
-                if not self.check_collision_custom(new_node.joint_angles, self.q_goal.joint_angles):
+                if not self._check_edge_collision(new_node.joint_angles, self.q_goal.joint_angles):
                     
-                    # Add Goal Node
                     self.q_goal.parent = new_node
                     self._visualize_edge(new_node.joint_angles, self.q_goal.joint_angles)
                     
-                    # Backtrack Path
+                    # Extract Path
                     path = []
-                    node = self.q_goal
-                    while node is not None:
-                        path.append(np.asarray(node.joint_angles, dtype=float))
-                        node = node.parent
-                    path.reverse()
-                    return np.vstack(path)
-        
+                    curr = self.q_goal
+                    while curr is not None:
+                        path.append(curr.joint_angles)
+                        curr = curr.parent
+                    return np.array(path[::-1]) # Reverse
+
         return None

@@ -1,7 +1,7 @@
 import os
 import csv
 import math
-from collections import defaultdict, Counter
+from collections import defaultdict
 
 def read_csv(path):
     if not os.path.exists(path):
@@ -39,7 +39,10 @@ def summarize_by_env_noise(rows):
         noise = r.get("noise_std", "unknown")
         groups[(env, noise)].append(r)
     summaries = []
-    for (env, noise), items in groups.items():
+    # Sort keys: env string, then noise as float
+    sorted_keys = sorted(groups.keys(), key=lambda x: (x[0], to_float(x[1])))
+    for (env, noise) in sorted_keys:
+        items = groups[(env, noise)]
         n = len(items)
         success = sum(1 for r in items if to_bool(r.get("success")))
         planner_success = sum(1 for r in items if to_bool(r.get("planner_success")))
@@ -48,7 +51,8 @@ def summarize_by_env_noise(rows):
         waypoints = avg([to_int(r.get("num_waypoints")) for r in items])
         nodes = avg([to_int(r.get("total_nodes")) for r in items])
         plan_time = avg([to_float(r.get("planning_time")) for r in items])
-        summaries.append({
+        
+        summary = {
             "env": env,
             "noise_std": noise,
             "trials": n,
@@ -58,14 +62,54 @@ def summarize_by_env_noise(rows):
             "avg_path_length": round(path_len, 4) if not math.isnan(path_len) else math.nan,
             "avg_num_waypoints": round(waypoints, 3) if not math.isnan(waypoints) else math.nan,
             "avg_total_nodes": round(nodes, 3) if not math.isnan(nodes) else math.nan,
-            "avg_planning_time_s": round(plan_time, 4) if not math.isnan(plan_time) else math.nan,
-        })
+        }
+        if not math.isnan(plan_time):
+             summary["avg_planning_time_s"] = round(plan_time, 4)
+        summaries.append(summary)
+    return summaries
+
+def summarize_by_noise(rows):
+    """Summarize metrics grouped by noise_std only."""
+    groups = defaultdict(list)
+    for r in rows:
+        noise = r.get("noise_std", "unknown")
+        groups[noise].append(r)
+    summaries = []
+    
+    # Sort keys by noise value
+    sorted_keys = sorted(groups.keys(), key=lambda x: to_float(x))
+    
+    for noise in sorted_keys:
+        items = groups[noise]
+        n = len(items)
+        success = sum(1 for r in items if to_bool(r.get("success")))
+        planner_success = sum(1 for r in items if to_bool(r.get("planner_success")))
+        collision = sum(1 for r in items if to_bool(r.get("collision")))
+        path_len = avg([to_float(r.get("path_length")) for r in items])
+        waypoints = avg([to_int(r.get("num_waypoints")) for r in items])
+        nodes = avg([to_int(r.get("total_nodes")) for r in items])
+        plan_time = avg([to_float(r.get("planning_time")) for r in items])
+
+        summary = {
+            "noise_std": noise,
+            "trials": n,
+            "success_rate": round(success/n, 3) if n else math.nan,
+            "planner_success_rate": round(planner_success/n, 3) if n else math.nan,
+            "collision_rate": round(collision/n, 3) if n else math.nan,
+            "avg_path_length": round(path_len, 4) if not math.isnan(path_len) else math.nan,
+            "avg_num_waypoints": round(waypoints, 3) if not math.isnan(waypoints) else math.nan,
+            "avg_total_nodes": round(nodes, 3) if not math.isnan(nodes) else math.nan,
+        }
+        # Add planning time if available
+        if not math.isnan(plan_time):
+             summary["avg_planning_time_s"] = round(plan_time, 4)
+             
+        summaries.append(summary)
     return summaries
 
 def summarize_generic(rows):
     if not rows:
         return []
-    # For generic files (e.g., RRTCBFresults.csv), compute averages for numeric columns and counts for boolean columns
     fieldnames = rows[0].keys()
     numeric_cols, bool_cols = [], []
     for fn in fieldnames:
@@ -120,7 +164,7 @@ def main():
     rrt_path = os.path.join(base, "ablation_results_dual.csv")
 
     # Ablation summary (env, noise)
-    abl_fields, abl_rows = read_csv(abl_path)
+    _, abl_rows = read_csv(abl_path)
     if abl_rows:
         abl_summary = summarize_by_env_noise(abl_rows)
         print_table("ablation_results.csv summary (by env, noise_std)", abl_summary)
@@ -129,21 +173,33 @@ def main():
     else:
         print(f"No ablation_results.csv at {abl_path}")
 
-    # RRT-CBF results generic summary
-    rrtcbf_fields, rrtcbf_rows = read_csv(rrtcbf_path)
+    # RRT-CBF results summary (by noise_std if available)
+    _, rrtcbf_rows = read_csv(rrtcbf_path)
     if rrtcbf_rows:
-        rrtcbf_summary = summarize_generic(rrtcbf_rows)
-        print_table("RRTCBFresults.csv summary (numeric averages, boolean rates)", rrtcbf_summary)
+        if "noise_std" in rrtcbf_rows[0]:
+            rrtcbf_summary = summarize_by_noise(rrtcbf_rows)
+            title = "RRTCBFresults.csv summary (by noise_std)"
+        else:
+            rrtcbf_summary = summarize_generic(rrtcbf_rows)
+            title = "RRTCBFresults.csv summary (generic)"
+            
+        print_table(title, rrtcbf_summary)
         if write_csv(os.path.join(base, "RRTCBFresults_summary.csv"), rrtcbf_summary):
             print("Wrote RRTCBFresults_summary.csv")
     else:
         print(f"No RRTCBFresults.csv at {rrtcbf_path}")
 
-    # RRT results generic summary
-    rrt_fields, rrt_rows = read_csv(rrt_path)
+    # RRT results summary (by noise_std if available)
+    _, rrt_rows = read_csv(rrt_path)
     if rrt_rows:
-        rrt_summary = summarize_generic(rrt_rows)
-        print_table("RRTresults.csv summary (numeric averages, boolean rates)", rrt_summary)
+        if "noise_std" in rrt_rows[0]:
+            rrt_summary = summarize_by_noise(rrt_rows)
+            title = "RRTresults.csv summary (by noise_std)"
+        else:
+            rrt_summary = summarize_generic(rrt_rows)
+            title = "RRTresults.csv summary (generic)"
+
+        print_table(title, rrt_summary)
         if write_csv(os.path.join(base, "RRTresults_summary.csv"), rrt_summary):
             print("Wrote RRTresults_summary.csv")
     else:
