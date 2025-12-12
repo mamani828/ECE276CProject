@@ -57,17 +57,17 @@ class RRT:
         """
         Explicitly checks collision for a specific configuration.
         """
-        # 1. Set Robot Configuration
+        # Set Robot Configuration
         for i, j_idx in enumerate(self.joint_indices):
             p.resetJointState(self.robot_id, j_idx, config[i])
         p.performCollisionDetection()
 
-        # 2. Check Environment Collision
+        # Check Environment Collision
         for obj_id in self.obstacle_ids:
             if p.getContactPoints(bodyA=self.robot_id, bodyB=obj_id):
                 return True  # Collision
 
-        # 3. Check Self Collision (Arm vs Arm)
+        # Check Self Collision (Arm vs Arm)
         if p.getContactPoints(bodyA=self.robot_id, bodyB=self.robot_id):
             return True
 
@@ -86,7 +86,7 @@ class RRT:
 
     def _visualize_edge(self, q1, q2):
         """Draws a line for both End Effectors between q1 and q2."""
-        # 1. Get Start Positions
+        # Get Start Positions
         for i, j_idx in enumerate(self.joint_indices):
             p.resetJointState(self.robot_id, j_idx, q1[i])
 
@@ -95,7 +95,7 @@ class RRT:
             state = p.getLinkState(self.robot_id, ee, computeForwardKinematics=True)
             pos1.append(state[4])  # World pos
 
-        # 2. Get End Positions
+        # Get End Positions
         for i, j_idx in enumerate(self.joint_indices):
             p.resetJointState(self.robot_id, j_idx, q2[i])
 
@@ -104,7 +104,7 @@ class RRT:
             state = p.getLinkState(self.robot_id, ee, computeForwardKinematics=True)
             pos2.append(state[4])
 
-        # 3. Draw Lines (Green=Left, Yellow=Right)
+        # Draw Lines (Green=Left, Yellow=Right)
         colors = [[0, 1, 0], [1, 1, 0]]
         for k in range(len(self.ee_indices)):
             p.addUserDebugLine(
