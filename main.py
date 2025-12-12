@@ -298,12 +298,18 @@ if __name__ == "__main__":
                 displacement_to_waypoint = waypoint - true_joint_positions
                 
                 # check if goal is reached
-                max_speed = 0.05
-                if np.linalg.norm(displacement_to_waypoint) < max_speed:
+                if np.linalg.norm(displacement_to_waypoint) < 0.01:
+                    # stop the robot
+                    p.setJointMotorControlArray(
+                        bodyIndex=arm_id,
+                        jointIndices=[0, 1, 2],
+                        controlMode=p.VELOCITY_CONTROL,
+                        targetVelocities=[0.0] * 3,
+                    )
                     break
                 else:
                     # calculate the "velocity" to reach the next waypoint
-                    velocities = [0.5] * 3                  
+                    velocities = displacement_to_waypoint * 0.5  # gain of 5.0                
 
                     for joint_index, velocity in enumerate(velocities):
                         p.setJointMotorControl2(
