@@ -107,7 +107,7 @@ def execute_path_and_check_collision(
                 [p.getJointState(arm_id, j)[0] for j in range(3)]
             )
             displacement_to_waypoint = waypoint - true_joint_positions
-            if np.linalg.norm(displacement_to_waypoint) < 0.01:
+            if np.linalg.norm(displacement_to_waypoint) < 0.15:
                 # Stop the robot
                 p.setJointMotorControlArray(
                     bodyIndex=arm_id,
@@ -118,7 +118,7 @@ def execute_path_and_check_collision(
                 break
             else:
                 # Calculate the "velocity" to reach the next waypoint
-                velocities = displacement_to_waypoint * 0.5
+                velocities = displacement_to_waypoint * 4.5
 
                 for joint_index, velocity in enumerate(velocities):
                     p.setJointMotorControl2(

@@ -151,7 +151,7 @@ def execute_path_and_check_collision_dual(
             disp = waypoint - true_joint_positions
             dist = np.linalg.norm(disp)
 
-            arrival_tolerance = 0.02
+            arrival_tolerance = 0.1
             execution_speed = 0.5
 
             if dist < arrival_tolerance:
