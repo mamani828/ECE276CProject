@@ -223,8 +223,8 @@ def main():
             title = "RRTCBFresults.csv summary (generic)"
             
         print_table(title, rrtcbf_summary)
-        if write_csv(os.path.join(base, "RRTCBFresults_summary_final_single_complex.csv"), rrtcbf_summary):
-            print("Wrote RRTCBFresults_summary_final_single_complex.csv")
+        if write_csv(os.path.join(base, "RRTCBFresults_summary_final_single_simple.csv"), rrtcbf_summary):
+            print("Wrote RRTCBFresults_summary_final_single_simple.csv")   
     else:
         print(f"No RRTCBFresults.csv at {rrtcbf_path}")
 
@@ -239,8 +239,8 @@ def main():
             title = "RRTresults.csv summary (generic)"
 
         print_table(title, rrt_summary)
-        if write_csv(os.path.join(base, "RRTresults_summary_final_single_complex.csv"), rrt_summary):
-            print("Wrote RRTresults_summary_final_single_complex.csv")
+        if write_csv(os.path.join(base, "RRTresults_summary_final_single_simple.csv"), rrt_summary):
+            print("Wrote RRTresults_summary_final_single_simple.csv")
     else:
         print(f"No RRTresults.csv at {rrt_path}")
 
