@@ -8,7 +8,10 @@ from utils import (
     plot_rrt_edge,
 )
 
-def check_node_collision(robot_id, object_ids, joint_indices, joint_position, distance=0.0):
+
+def check_node_collision(
+    robot_id, object_ids, joint_indices, joint_position, distance=0.0
+):
     """
     Checks for collisions between a robot and a set of objects in PyBullet.
     """
@@ -39,11 +42,13 @@ def check_node_collision(robot_id, object_ids, joint_indices, joint_position, di
 
     return False
 
+
 class Node:
     def __init__(self, joint_angles):
         self.joint_angles = np.array(joint_angles)
         self.parent = None
         self.cost = 0.0
+
 
 class RRT_CBF:
     def __init__(
@@ -111,9 +116,9 @@ class RRT_CBF:
         J_pos, J_orn = p.calculateJacobian(
             self.robot_id, link_index, local_pos, q.tolist(), zeros, zeros
         )
-        # PyBullet returns Jacobian for ALL joints. We must slice it to keep only 
+        # PyBullet returns Jacobian for ALL joints. We must slice it to keep only
         # the columns corresponding to our controlled 'joint_indices'.
-        # However, if 'joint_indices' matches the robot's movable joints exactly 
+        # However, if 'joint_indices' matches the robot's movable joints exactly
         # (and in order), PyBullet usually returns the correct size or we just use it directly.
         # For safety with fixed base robots where first indices are 0:
         return np.array(J_pos)
@@ -146,13 +151,13 @@ class RRT_CBF:
 
             grad_phi = self._sdf_grad_world(x)
             J_pos = self._sphere_jacobian(link_index, local_pos, q)
-            
+
             # Ensure Jacobian dimensions match q
             # If J_pos is larger (e.g. includes fixed joints), slice it.
             if J_pos.shape[1] > len(q):
-                 # This mapping depends on your specific URDF joint mapping. 
-                 # For now, assuming J_pos corresponds to movable joints if passed correctly.
-                 pass
+                # This mapping depends on your specific URDF joint mapping.
+                # For now, assuming J_pos corresponds to movable joints if passed correctly.
+                pass
 
             dh_i = grad_phi @ J_pos
             h_list.append(h_i)
@@ -215,14 +220,14 @@ class RRT_CBF:
         """
         # Colors: Green for Left EE, Yellow for Right EE
         colors = [[0, 1, 0], [1, 1, 0]]
-        
+
         # 1. Get positions at q_from
         self._set_robot_config(q_from)
         pos_from = []
         for ee_idx in self.ee_indices:
             state = p.getLinkState(self.robot_id, ee_idx, computeForwardKinematics=True)
-            pos_from.append(state[4]) # Index 4 is Link World Position
-            
+            pos_from.append(state[4])  # Index 4 is Link World Position
+
         # 2. Get positions at q_to
         self._set_robot_config(q_to)
         pos_to = []
@@ -238,7 +243,7 @@ class RRT_CBF:
                 lineToXYZ=pos_to[k],
                 lineColorRGB=c,
                 lineWidth=1,
-                lifeTime=0 # 0 means permanent
+                lifeTime=0,  # 0 means permanent
             )
 
     def plan(self):
@@ -251,7 +256,9 @@ class RRT_CBF:
                     dtype=float,
                 )
 
-            if check_node_collision(self.robot_id, self.obstacle_ids, self.joint_indices, q_rand):
+            if check_node_collision(
+                self.robot_id, self.obstacle_ids, self.joint_indices, q_rand
+            ):
                 continue
 
             nearest = self.get_nearest_node(q_rand)
@@ -260,24 +267,34 @@ class RRT_CBF:
             if np.allclose(q_new, nearest.joint_angles):
                 continue
 
-            if check_node_collision(self.robot_id, self.obstacle_ids, self.joint_indices, q_new):
+            if check_node_collision(
+                self.robot_id, self.obstacle_ids, self.joint_indices, q_new
+            ):
                 continue
 
             new_node = Node(q_new)
             new_node.parent = nearest
             self.node_list.append(new_node)
-            
+
             # Draw Edge for BOTH arms
             self._visualize_edge(nearest.joint_angles, new_node.joint_angles)
 
             # Check if close to goal
-            if np.linalg.norm(new_node.joint_angles - self.q_goal.joint_angles) <= self.step_size:
+            if (
+                np.linalg.norm(new_node.joint_angles - self.q_goal.joint_angles)
+                <= self.step_size
+            ):
                 q_goal_proj = self.step(new_node.joint_angles, self.q_goal.joint_angles)
 
-                if check_node_collision(self.robot_id, self.obstacle_ids, self.joint_indices, q_goal_proj):
+                if check_node_collision(
+                    self.robot_id, self.obstacle_ids, self.joint_indices, q_goal_proj
+                ):
                     continue
 
-                if np.linalg.norm(q_goal_proj - self.q_goal.joint_angles) < self.step_size:
+                if (
+                    np.linalg.norm(q_goal_proj - self.q_goal.joint_angles)
+                    < self.step_size
+                ):
                     goal_node = Node(q_goal_proj)
                     goal_node.parent = new_node
                     self.node_list.append(goal_node)

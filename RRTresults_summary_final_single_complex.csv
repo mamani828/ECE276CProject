@@ -1,5 +1,5 @@
-noise_std,trials,success_rate,planner_success_rate,collision_rate,avg_path_length,avg_num_waypoints,std_num_waypoints,avg_total_nodes,std_total_nodes,avg_planning_time_s
-0.0,5,1.0,1.0,0.0,9.7179,21.6,3.05,81.2,19.149,0.0657
-0.005,5,0.8,1.0,0.2,9.7179,21.6,3.05,81.2,19.149,0.0667
-0.01,5,0.6,1.0,0.4,9.7179,21.6,3.05,81.2,19.149,0.0671
-0.02,5,0.6,1.0,0.4,9.7179,21.6,3.05,81.2,19.149,0.0684
+noise_std, trials, success_rate, planner_success_rate, collision_rate, avg_path_length, avg_num_waypoints, std_num_waypoints, avg_total_nodes, std_total_nodes, avg_planning_time_s
+0.0, 5, 1.0, 1.0, 0.0, 9.7179, 21.6, 3.05, 81.2, 19.149, 0.0657
+0.005, 5, 0.8, 1.0, 0.2, 9.7179, 21.6, 3.05, 81.2, 19.149, 0.0667
+0.01, 5, 0.6, 1.0, 0.4, 9.7179, 21.6, 3.05, 81.2, 19.149, 0.0671
+0.02, 5, 0.6, 1.0, 0.4, 9.7179, 21.6, 3.05, 81.2, 19.149, 0.0684

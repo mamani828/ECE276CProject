@@ -1,21 +1,21 @@
-env,noise_std,seed,planner_success,collision,success,path_length,num_waypoints,total_nodes
-simple,0.0,0,True,False,True,12.634709268899893,54,146
-simple,0.0,1,True,False,True,15.051173167264663,64,171
-simple,0.0,3,True,False,True,11.749684627759583,52,116
-simple,0.0,4,True,False,True,12.51514963798712,53,136
-simple,0.0,5,True,False,True,14.022811650399257,60,177
-simple,0.005,0,True,False,True,12.634709268899893,54,146
-simple,0.005,1,True,False,True,15.051173167264663,64,171
-simple,0.005,3,True,False,True,11.749684627759583,52,116
-simple,0.005,4,True,False,True,12.51514963798712,53,136
-simple,0.005,5,True,False,True,14.022811650399257,60,177
-simple,0.01,0,True,False,True,12.634709268899893,54,146
-simple,0.01,1,True,False,True,15.051173167264663,64,171
-simple,0.01,3,True,False,True,11.749684627759583,52,116
-simple,0.01,4,True,False,True,12.51514963798712,53,136
-simple,0.01,5,True,False,True,14.022811650399257,60,177
-simple,0.02,0,True,True,False,12.634709268899893,54,146
-simple,0.02,1,True,False,True,15.051173167264663,64,171
-simple,0.02,3,True,True,False,11.749684627759583,52,116
-simple,0.02,4,True,False,True,12.51514963798712,53,136
-simple,0.02,5,True,True,False,14.022811650399257,60,177
+env, noise_std, seed, planner_success, collision, success, path_length, num_waypoints, total_nodes
+simple, 0.0, 0, True, False, True, 12.634709268899893, 54, 146
+simple, 0.0, 1, True, False, True, 15.051173167264663, 64, 171
+simple, 0.0, 3, True, False, True, 11.749684627759583, 52, 116
+simple, 0.0, 4, True, False, True, 12.51514963798712, 53, 136
+simple, 0.0, 5, True, False, True, 14.022811650399257, 60, 177
+simple, 0.005, 0, True, False, True, 12.634709268899893, 54, 146
+simple, 0.005, 1, True, False, True, 15.051173167264663, 64, 171
+simple, 0.005, 3, True, False, True, 11.749684627759583, 52, 116
+simple, 0.005, 4, True, False, True, 12.51514963798712, 53, 136
+simple, 0.005, 5, True, False, True, 14.022811650399257, 60, 177
+simple, 0.01, 0, True, False, True, 12.634709268899893, 54, 146
+simple, 0.01, 1, True, False, True, 15.051173167264663, 64, 171
+simple, 0.01, 3, True, False, True, 11.749684627759583, 52, 116
+simple, 0.01, 4, True, False, True, 12.51514963798712, 53, 136
+simple, 0.01, 5, True, False, True, 14.022811650399257, 60, 177
+simple, 0.02, 0, True, True, False, 12.634709268899893, 54, 146
+simple, 0.02, 1, True, False, True, 15.051173167264663, 64, 171
+simple, 0.02, 3, True, True, False, 11.749684627759583, 52, 116
+simple, 0.02, 4, True, False, True, 12.51514963798712, 53, 136
+simple, 0.02, 5, True, True, False, 14.022811650399257, 60, 177

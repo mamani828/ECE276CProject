@@ -12,6 +12,7 @@ from sdf import make_pybullet_env_sdf, visualize_sdf_slices
 from envs import get_env
 from utils import mark_goal_configurations
 
+
 def create_visual_spheres(spheres, color=[1, 0, 0, 0.4]):
     """
     Creates visual-only sphere bodies in PyBullet.
@@ -20,37 +21,34 @@ def create_visual_spheres(spheres, color=[1, 0, 0, 0.4]):
     sphere_body_ids = []
     for sph in spheres:
         r = sph["radius"]
-        
+
         # Create the visual shape
-        v_id = p.createVisualShape(
-            shapeType=p.GEOM_SPHERE,
-            radius=r,
-            rgbaColor=color
-        )
-        
+        v_id = p.createVisualShape(shapeType=p.GEOM_SPHERE, radius=r, rgbaColor=color)
+
         # Create the body (no mass, no collision, just visual)
         # We start them at [0,0,0]; they will be moved immediately
         b_id = p.createMultiBody(
             baseMass=0,
             baseCollisionShapeIndex=-1,
             baseVisualShapeIndex=v_id,
-            basePosition=[0, 0, 0] 
+            basePosition=[0, 0, 0],
         )
         sphere_body_ids.append(b_id)
-        
+
     return sphere_body_ids
+
 
 def update_visual_spheres(robot_id, sphere_body_ids, spheres):
     """
-    Updates the positions of the existing visual spheres based on the 
+    Updates the positions of the existing visual spheres based on the
     CURRENT robot state (simulation state).
     """
     # Cache link states to avoid calling getLinkState multiple times for the same link
     link_states = {}
-    
+
     for i, sph in enumerate(spheres):
         link_idx = sph["link_index"]
-        
+
         # Fetch link state only if we haven't already for this frame
         if link_idx not in link_states:
             state = p.getLinkState(robot_id, link_idx, computeForwardKinematics=True)
@@ -58,16 +56,17 @@ def update_visual_spheres(robot_id, sphere_body_ids, spheres):
             link_orn = state[1]
             link_rot = np.array(p.getMatrixFromQuaternion(link_orn)).reshape(3, 3)
             link_states[link_idx] = (link_pos, link_rot)
-            
+
         # Retrieve cached state
         pos, rot = link_states[link_idx]
         local_pos = np.array(sph["local_pos"])
-        
+
         # Calculate new world position: p_world = p_link + R_link * p_local
         world_pos = pos + rot @ local_pos
-        
+
         # Teleport the sphere body to the new location
         p.resetBasePositionAndOrientation(sphere_body_ids[i], world_pos, [0, 0, 0, 1])
+
 
 def get_link_axis_and_length(robot_id, link_index, q_ref=None):
     """Compute local axis and length of link using a reference configuration."""
@@ -180,9 +179,9 @@ if __name__ == "__main__":
             "cube.urdf",
             basePosition=collision_positions[i],
             baseOrientation=p.getQuaternionFromEuler(collision_orientations[i]),
-            globalScaling=collision_scales[i]
+            globalScaling=collision_scales[i],
         )
-        
+
         p.changeVisualShape(uid, -1, rgbaColor=colors[i])
         collision_ids.append(uid)
 
@@ -207,7 +206,7 @@ if __name__ == "__main__":
     for joint_index, joint_pos in enumerate(goal_positions[0]):
         p.resetJointState(arm_id, joint_index, joint_pos)
     sdf_env = make_pybullet_env_sdf(collision_ids, max_distance=5.5, probe_radius=0.01)
-    
+
     # visualize_sdf_slices(sdf_env, heights=[0.15, 0.25, 0.35, 0.45, 0.55, 0.65])
 
     for i in range(len(goal_positions) - 1):
@@ -228,10 +227,8 @@ if __name__ == "__main__":
             alpha=50.0,
             d_safe=0.1,
         )
-        path_segment = (
-            rrt_planner.plan()
-        )
-        
+        path_segment = rrt_planner.plan()
+
         # rrt_planner = RRT(q_start, q_goal, arm_id, collision_ids, joint_limits,
         #                     max_iter=5000,
         #                     step_size=0.5)
@@ -266,24 +263,22 @@ if __name__ == "__main__":
             orig_pos = collision_positions[idx]
 
             # Calculate new position (Preserve Z)
-            new_pos = [
-                orig_pos[0] + dx, 
-                orig_pos[1] + dy, 
-                orig_pos[2]
-            ]
+            new_pos = [orig_pos[0] + dx, orig_pos[1] + dy, orig_pos[2]]
 
             # Map index to pybullet body ID (collision_ids[0] is ground, so +1)
             body_id = collision_ids[idx + 1]
 
             # Apply the transform
-            p.resetBasePositionAndOrientation(body_id, new_pos, p.getQuaternionFromEuler(collision_orientations[idx]))
+            p.resetBasePositionAndOrientation(
+                body_id, new_pos, p.getQuaternionFromEuler(collision_orientations[idx])
+            )
     print("Added noise to the environment")
     time.sleep(2)
 
     # Move through the waypoints
     print(f"Number of nodes {len(rrt_planner.node_list)}")
     live_sphere_ids = create_visual_spheres(ROBOT_SPHERES, color=[0, 1, 0, 0.3])
-    
+
     for joint_index, joint_pos in enumerate(goal_positions[0]):
         p.resetJointState(arm_id, joint_index, joint_pos)
     for waypoint in path_saved:
@@ -292,11 +287,13 @@ if __name__ == "__main__":
             # run velocity control until waypoint is reached
             while True:
                 # get current joint positions (ground truth)
-                true_joint_positions = np.array([p.getJointState(arm_id, i)[0] for i in range(3)])
-                
+                true_joint_positions = np.array(
+                    [p.getJointState(arm_id, i)[0] for i in range(3)]
+                )
+
                 # calculate the displacement to reach the next waypoint using MEASURED positions
                 displacement_to_waypoint = waypoint - true_joint_positions
-                
+
                 # check if goal is reached
                 if np.linalg.norm(displacement_to_waypoint) < 0.01:
                     # stop the robot
@@ -309,7 +306,7 @@ if __name__ == "__main__":
                     break
                 else:
                     # calculate the "velocity" to reach the next waypoint
-                    velocities = displacement_to_waypoint * 0.5  # gain of 5.0                
+                    velocities = displacement_to_waypoint * 0.5  # gain of 5.0
 
                     for joint_index, velocity in enumerate(velocities):
                         p.setJointMotorControl2(
@@ -334,7 +331,7 @@ if __name__ == "__main__":
                 # Update the visual spheres to the current robot state
                 update_visual_spheres(arm_id, live_sphere_ids, ROBOT_SPHERES)
         time.sleep(1.0 / 240.0)
-    
+
     print("Path execution completed successfully!")
     # Disconnect from PyBullet
     p.disconnect()

@@ -1,17 +1,18 @@
 import random
 import time
+
 import numpy as np
 import pybullet as p
 import pybullet_data
-from matplotlib import pyplot as plt
 
-# Assuming these exist in your local directory as before
+from matplotlib import pyplot as plt
 from rrt_dual import RRT
 from rrt_cbf_dual import RRT_CBF
 from useful_code import *
 from sdf import make_pybullet_env_sdf
 from utils import is_state_valid, mark_goal_configurations_dual
 from envs import get_env
+
 
 # Helper functions
 def create_visual_spheres(spheres, color=[0, 1, 0, 0.1]):
@@ -22,34 +23,31 @@ def create_visual_spheres(spheres, color=[0, 1, 0, 0.1]):
     sphere_body_ids = []
     for sph in spheres:
         r = sph["radius"]
-        
+
         # Visual shape with low alpha (transparency)
-        v_id = p.createVisualShape(
-            shapeType=p.GEOM_SPHERE,
-            radius=r,
-            rgbaColor=color
-        )
-        
+        v_id = p.createVisualShape(shapeType=p.GEOM_SPHERE, radius=r, rgbaColor=color)
+
         # Body with NO collision (-1)
         b_id = p.createMultiBody(
             baseMass=0,
-            baseCollisionShapeIndex=-1, # Ghost object
+            baseCollisionShapeIndex=-1,  # Ghost object
             baseVisualShapeIndex=v_id,
-            basePosition=[0, 0, 0] 
+            basePosition=[0, 0, 0],
         )
         sphere_body_ids.append(b_id)
-        
+
     return sphere_body_ids
+
 
 def update_visual_spheres(robot_id, sphere_body_ids, spheres):
     """
     Updates the positions of existing spheres to match the robot's current state.
     """
-    link_states = {} # Cache to avoid repeated PyBullet calls
-    
+    link_states = {}
+
     for i, sph in enumerate(spheres):
         link_idx = sph["link_index"]
-        
+
         # Fetch link state only if we haven't already for this frame
         if link_idx not in link_states:
             state = p.getLinkState(robot_id, link_idx, computeForwardKinematics=True)
@@ -57,11 +55,11 @@ def update_visual_spheres(robot_id, sphere_body_ids, spheres):
             link_orn = state[1]
             link_rot = np.array(p.getMatrixFromQuaternion(link_orn)).reshape(3, 3)
             link_states[link_idx] = (link_pos, link_rot)
-            
+
         # Retrieve cached state
         pos, rot = link_states[link_idx]
         local_pos = np.array(sph["local_pos"])
-        
+
         # Transform: World = Link_Pos + Rotation * Local_Pos
         world_pos = pos + rot @ local_pos
 
@@ -70,48 +68,48 @@ def update_visual_spheres(robot_id, sphere_body_ids, spheres):
 
 def get_link_axis_and_length(robot_id, link_index, q_ref=None):
     """Compute local axis and length of link using a reference configuration."""
-    # 1. Set reference configuration (zero pose)
+    # Set reference configuration (zero pose)
     if q_ref is None:
         # Reset all joints to 0
         for j in range(p.getNumJoints(robot_id)):
             p.resetJointState(robot_id, j, 0.0)
-            
-    # 2. Get current link pose
+
+    # Get current link pose
     link_state = p.getLinkState(robot_id, link_index, computeForwardKinematics=True)
     pos_link = np.array(link_state[0])
     orn_link = link_state[1]
     R = np.array(p.getMatrixFromQuaternion(orn_link)).reshape(3, 3)
 
-    # 3. Determine "Child" position to calculate length
+    # Determine "Child" position to calculate length
     # In a tree, we look for a joint whose parent is THIS link.
     child_found = False
-    pos_child = pos_link # Default if no child found
+    pos_child = pos_link  # Default if no child found
 
     # Scan all joints to find one whose parent is 'link_index'
     for j in range(p.getNumJoints(robot_id)):
         info = p.getJointInfo(robot_id, j)
-        parent_index = info[16] # Index 16 is parentIndex
+        parent_index = info[16]  # Index 16 is parentIndex
         if parent_index == link_index:
             # We found a child link!
             child_state = p.getLinkState(robot_id, j, computeForwardKinematics=True)
             pos_child = np.array(child_state[0])
             child_found = True
-            break # Just take the first child (assuming simple chain segments)
+            break  # Just take the first child (assuming simple chain segments)
 
     # If no child joint (it's an end effector tip), make a synthetic length
     if not child_found:
-        # Assuming cylinder aligned along X or similar, 
+        # Assuming cylinder aligned along X or similar,
         # or just hardcode a small offset for the tip
-        pos_child = pos_link + np.array([0.5, 0.0, 0.0]) # Matches URDF length roughly
+        pos_child = pos_link + np.array([0.5, 0.0, 0.0])  # Matches URDF length roughly
 
-    # 4. Calculate Direction and Length in World Frame
+    # Calculate Direction and Length in World Frame
     dir_world = pos_child - pos_link
     length = np.linalg.norm(dir_world)
-    
+
     if length < 1e-6:
         return np.array([1.0, 0.0, 0.0]), 0.0
 
-    # 5. Transform to Local Frame: dir_local = R^T * dir_world
+    # Transform to Local Frame: dir_local = R^T * dir_world
     dir_local = R.T @ (dir_world / length)
     return dir_local, length
 
@@ -157,7 +155,7 @@ def make_link_spheres_from_fk(
 if __name__ == "__main__":
     # Problem setup
     env = "simple"
-    # Initialize PyBullet
+
     p.connect(p.GUI)
     # For Mac this will run faster
     # p.connect(p.DIRECT)
@@ -168,37 +166,37 @@ if __name__ == "__main__":
     ground_id = p.loadURDF("plane.urdf")
     # Ensure you are loading the updated URDF file name here
     arm_id = p.loadURDF("dual_three_link_robot.urdf", [0, 0, 0], useFixedBase=True)
-    
+
     # Identify Movable Joints (Revolute Only)
     movable_joints = []
     movable_joint_names = []
-    
+
     num_joints = p.getNumJoints(arm_id)
     print(f"Total joints in URDF: {num_joints}")
-    
+
     for i in range(num_joints):
         info = p.getJointInfo(arm_id, i)
         j_type = info[2]
-        j_name = info[1].decode('utf-8')
+        j_name = info[1].decode("utf-8")
         # We only control Revolute joints (ignore Fixed joints at EE)
         if j_type == p.JOINT_REVOLUTE:
             movable_joints.append(i)
             movable_joint_names.append(j_name)
-            
+
     print(f"Planning for joints: {movable_joints} ({movable_joint_names})")
     # This should be indices [0, 1, 2, 4, 5, 6] typically
-    
+
     # Generate Collision Spheres for All Links
-    q_ref = [0.0] * num_joints # Reference pose for calculation
+    q_ref = [0.0] * num_joints  # Reference pose for calculation
     ROBOT_SPHERES = []
-    
-    # We generate spheres for every movable link. 
+
+    # We generate spheres for every movable link.
     # Note: movable_joints points to the joint, which usually has the same index as the child link.
     for link_idx in movable_joints:
         ROBOT_SPHERES += make_link_spheres_from_fk(
             arm_id,
             link_index=link_idx,
-            radius=0.08, # Slightly smaller for dual arm to avoid self-collision at start
+            radius=0.08,  # Slightly smaller for dual arm to avoid self-collision at start
             q_ref=q_ref,
             max_spacing_factor=1.0,
             min_spheres=2,
@@ -213,7 +211,7 @@ if __name__ == "__main__":
             "cube.urdf",
             basePosition=collision_positions[i],
             baseOrientation=p.getQuaternionFromEuler(collision_orientations[i]),
-            globalScaling=collision_scales[i]
+            globalScaling=collision_scales[i],
         )
         p.changeVisualShape(uid, -1, rgbaColor=colors[i])
         collision_ids.append(uid)
@@ -232,10 +230,10 @@ if __name__ == "__main__":
         [2.347, 0.727, -0.496],
         [-1.289, 1.223, -1.322],
     ]
-    
+
     goal_positions = []
     for i in range(len(left_arm_goals)):
-        # Construct a 6D goal. 
+        # Construct a 6D goal.
         # Left arm does 'g'. Right arm does 'g' (but mirrored logic might be needed depending on coord system).
         # For simplicity, let's just apply 'g' to both.
         # Since the right arm is mounted differently, 'g' might look different, but it's valid joint space.
@@ -244,16 +242,16 @@ if __name__ == "__main__":
 
     print("Checking validity of goal positions...")
     valid_goals = []
-    
+
     for i, goal in enumerate(goal_positions):
         valid = is_state_valid(
             robot_id=arm_id,
             joint_indices=movable_joints,
             q_target=goal,
-            obstacle_ids=collision_ids, # Defined in Step 3
-            check_self=True
+            obstacle_ids=collision_ids,  # Defined in Step 3
+            check_self=True,
         )
-        
+
         if valid:
             valid_goals.append(goal)
             print(f"Goal {i}: VALID")
@@ -264,8 +262,9 @@ if __name__ == "__main__":
     if len(valid_goals) < 2:
         print("Error: Not enough valid goals to form a path!")
         exit()
-        
+
     goal_positions = valid_goals
+
     # Mark the goal configurations
     def get_joint_index_by_name(robot_id, name):
         for i in range(p.getNumJoints(robot_id)):
@@ -278,7 +277,9 @@ if __name__ == "__main__":
     left_ee_idx = get_joint_index_by_name(arm_id, "ee_joint_left")
     right_ee_idx = get_joint_index_by_name(arm_id, "ee_joint_right")
 
-    mark_goal_configurations_dual(arm_id, movable_joints, goal_positions, left_ee_idx, right_ee_idx)
+    mark_goal_configurations_dual(
+        arm_id, movable_joints, goal_positions, left_ee_idx, right_ee_idx
+    )
     # Reset robot to the first valid goal to start
     for i, joint_idx in enumerate(movable_joints):
         p.resetJointState(arm_id, joint_idx, goal_positions[0][i])
@@ -286,17 +287,15 @@ if __name__ == "__main__":
     # Joint Limits: 6 pairs of [-pi, pi] etc.
     # We replicate the original limits twice.
     single_limits = [[-np.pi, np.pi], [0, np.pi], [-np.pi, np.pi]]
-    joint_limits = single_limits + single_limits 
+    joint_limits = single_limits + single_limits
 
     # Path container - initialized with start position
     path_saved = np.array([goal_positions[0]])
 
-    # Initialize SDF and Planner
-    
     # Set robot to start position
     for i, joint_idx in enumerate(movable_joints):
         p.resetJointState(arm_id, joint_idx, goal_positions[0][i])
-        
+
     sdf_env = make_pybullet_env_sdf(collision_ids, max_distance=5.5, probe_radius=0.01)
 
     # Planning Loop
@@ -334,7 +333,7 @@ if __name__ == "__main__":
             max_iter=10000,
             step_size=0.3,
         )
-        
+
         path_segment = rrt_planner.plan()
 
         if path_segment is None:
@@ -355,34 +354,32 @@ if __name__ == "__main__":
     # Adjust these standard deviations to control noise magnitude
     noise_std = 0.0
     for xy_key, indices in stack_groups.items():
-        # Generate ONE noise vector for this specific stack/location
+        # Generate noise vector for this specific stack/location
         # This ensures all cubes in a stack move together
         dx = random.gauss(0, noise_std)
         dy = random.gauss(0, noise_std)
 
         for idx in indices:
-            # Retrieve original hardcoded values
+            # Retrieve original values
             orig_pos = collision_positions[idx]
 
             # Calculate new position (Preserve Z)
-            new_pos = [
-                orig_pos[0] + dx, 
-                orig_pos[1] + dy, 
-                orig_pos[2]
-            ]
+            new_pos = [orig_pos[0] + dx, orig_pos[1] + dy, orig_pos[2]]
 
             # Map index to pybullet body ID (collision_ids[0] is ground, so +1)
             body_id = collision_ids[idx + 1]
 
             # Apply the transform
-            p.resetBasePositionAndOrientation(body_id, new_pos, p.getQuaternionFromEuler(collision_orientations[idx]))
+            p.resetBasePositionAndOrientation(
+                body_id, new_pos, p.getQuaternionFromEuler(collision_orientations[idx])
+            )
     print("Added noise to the environment")
     time.sleep(2)
-    
+
     # Execution Loop
     print(f"\nExecuting path with {len(path_saved)} total waypoints...")
-    
-    # 1. Reset Robot to the START of the path
+
+    # Reset Robot to the START of the path
     # This ensures we don't start from the END position of the last planning segment
     print("Resetting robot to start configuration...")
     start_config = path_saved[0]
@@ -392,8 +389,8 @@ if __name__ == "__main__":
     # Create visualization spheres
     live_sphere_ids = create_visual_spheres(ROBOT_SPHERES, color=[0, 1, 0, 0.1])
     # Thresholds
-    execution_speed = 0.5   # Max speed
-    arrival_tolerance = 0.05 # Distance to accept waypoint
+    execution_speed = 0.5  # Max speed
+    arrival_tolerance = 0.05  # Distance to accept waypoint
 
     for waypoint_idx, waypoint in enumerate(path_saved):
         # We loop until we are close enough to the CURRENT waypoint
@@ -404,25 +401,25 @@ if __name__ == "__main__":
                 s = p.getJointState(arm_id, j_idx)
                 true_joint_positions.append(s[0])
             true_joint_positions = np.array(true_joint_positions)
-            
+
             # Displacement vector in 6D
             displacement_to_waypoint = waypoint - true_joint_positions
             dist = np.linalg.norm(displacement_to_waypoint)
-            
+
             # Thresholds
-            execution_speed = 0.5   # How fast the robot moves (rad/s)
-            arrival_tolerance = 0.02 # How close we must be to move to next waypoint
-            
+            execution_speed = 0.5
+            arrival_tolerance = 0.02
+
             if dist < arrival_tolerance:
-                break # Reached waypoint, move to next
-            
+                break  # Reached waypoint, move to next
+
             # Calculate velocity vector
             # Scale the displacement vector to have magnitude 'execution_speed'
             # or less if we are very close.
             # velocities = [0.1] * len(movable_joints)
 
-            target_speed = min(execution_speed, dist * 2.0) 
-            velocities = (displacement_to_waypoint / dist) * target_speed       
+            target_speed = min(execution_speed, dist * 2.0)
+            velocities = (displacement_to_waypoint / dist) * target_speed
 
             # Apply velocities to all joints
             for k, v in enumerate(velocities):
@@ -431,25 +428,27 @@ if __name__ == "__main__":
                     jointIndex=movable_joints[k],
                     controlMode=p.VELOCITY_CONTROL,
                     targetVelocity=v,
-                    force=500 # Ensure sufficient force is applied
+                    force=500,  # Ensure sufficient force is applied
                 )
-            
+
             # Step physics
             p.stepSimulation()
-            
+
             # Update visualization
             update_visual_spheres(arm_id, live_sphere_ids, ROBOT_SPHERES)
             for obj_id in collision_ids:
-                    # getContactPoints returns a list if contact exists, None otherwise
-                    contacts = p.getContactPoints(bodyA=arm_id, bodyB=obj_id)
-                    if contacts:
-                        print(f"Collision detected with obstacle ID {obj_id}")
-                        exit()
+                # getContactPoints returns a list if contact exists, None otherwise
+                contacts = p.getContactPoints(bodyA=arm_id, bodyB=obj_id)
+                if contacts:
+                    print(f"Collision detected with obstacle ID {obj_id}")
+                    exit()
             # Sleep to keep viz readable
             time.sleep(1.0 / 240.0)
 
     print("Path execution complete.")
     while p.isConnected():
         p.stepSimulation()
-        update_visual_spheres(arm_id, live_sphere_ids, ROBOT_SPHERES) # Keep updating if you drag the robot with mouse
+        update_visual_spheres(
+            arm_id, live_sphere_ids, ROBOT_SPHERES
+        )  # Keep updating if you drag the robot with mouse
         time.sleep(0.1)

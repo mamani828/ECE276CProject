@@ -92,36 +92,38 @@ def visualize_sdf_slices(
 ):
     """
     Visualizes multiple 2D slices of the SDF at given heights in a single plot.
-    
+
     Args:
         env_sdf (function): The SDF function.
         heights (list[float]): A list of z-heights to slice.
         x_range, y_range, resolution, cmap, vmin, vmax: Visualization parameters.
     """
     num_plots = len(heights)
-    
+
     # Dynamically calculate grid size (e.g., max 3 columns)
     cols = 3
     rows = math.ceil(num_plots / cols)
-    
+
     # Create the subplots
-    fig, axes = plt.subplots(rows, cols, figsize=(5 * cols, 4 * rows), constrained_layout=True)
-    axes = axes.flatten() if num_plots > 1 else [axes] # Ensure axes is iterable
+    fig, axes = plt.subplots(
+        rows, cols, figsize=(5 * cols, 4 * rows), constrained_layout=True
+    )
+    axes = axes.flatten() if num_plots > 1 else [axes]  # Ensure axes is iterable
 
     x_vals = np.arange(x_range[0], x_range[1], resolution)
     y_vals = np.arange(y_range[0], y_range[1], resolution)
-    
+
     # Loop through heights and plot on corresponding axis
     for i, h in enumerate(heights):
         ax = axes[i]
-        
+
         # Calculate SDF slice
         sdf_values = np.zeros((len(y_vals), len(x_vals)))
         for ix, x in enumerate(x_vals):
             for iy, y in enumerate(y_vals):
                 point = (x, y, h)
                 sdf_values[iy, ix] = env_sdf(point)
-        
+
         # Plot
         im = ax.imshow(
             sdf_values,
@@ -137,8 +139,15 @@ def visualize_sdf_slices(
 
     # Hide any empty subplots (if len(heights) isn't a multiple of cols)
     for j in range(i + 1, len(axes)):
-        axes[j].axis('off')
+        axes[j].axis("off")
 
     # Add a shared colorbar
-    fig.colorbar(im, ax=axes, orientation='vertical', fraction=0.02, pad=0.04, label="Signed Distance")
+    fig.colorbar(
+        im,
+        ax=axes,
+        orientation="vertical",
+        fraction=0.02,
+        pad=0.04,
+        label="Signed Distance",
+    )
     plt.show()

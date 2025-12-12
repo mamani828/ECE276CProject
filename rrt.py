@@ -67,7 +67,9 @@ class RRT:
         q_from = np.asarray(from_node, dtype=float)
         q_to = np.asarray(to_joint_angles, dtype=float)
         if np.linalg.norm(q_to - q_from) >= self.step_size:
-            q_to = q_from + (self.step_size / np.linalg.norm(q_to - q_from)) * (q_to - q_from)
+            q_to = q_from + (self.step_size / np.linalg.norm(q_to - q_from)) * (
+                q_to - q_from
+            )
 
         d = q_to - q_from
         L = np.linalg.norm(d)

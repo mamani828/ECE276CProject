@@ -8,7 +8,10 @@ from utils import (
     plot_rrt_edge,
 )
 
-def check_node_collision(robot_id, object_ids, joint_indices, joint_position, distance=0.0):
+
+def check_node_collision(
+    robot_id, object_ids, joint_indices, joint_position, distance=0.0
+):
     """
     Checks for collisions between a robot and a set of objects in PyBullet.
 
@@ -287,7 +290,10 @@ class RRT_CBF:
             )
 
             # Try to connect to goal if close enough
-            if np.linalg.norm(new_node.joint_angles - self.q_goal.joint_angles) <= self.step_size:
+            if (
+                np.linalg.norm(new_node.joint_angles - self.q_goal.joint_angles)
+                <= self.step_size
+            ):
                 q_goal_proj = self.step(new_node.joint_angles, self.q_goal.joint_angles)
 
                 # Optional: also check that the projected goal config is safe
@@ -301,7 +307,10 @@ class RRT_CBF:
                     continue
 
                 # If CBF allows us to reach (or nearly reach) the goal config
-                if np.linalg.norm(q_goal_proj - self.q_goal.joint_angles) < self.step_size:
+                if (
+                    np.linalg.norm(q_goal_proj - self.q_goal.joint_angles)
+                    < self.step_size
+                ):
                     # Make an actual goal node that lives in the tree
                     goal_node = Node(q_goal_proj)
                     goal_node.parent = new_node
@@ -329,7 +338,6 @@ class RRT_CBF:
 
         # Failed to find a path within max_iter
         return None
-
 
     def get_nearest_node(self, q_rand):
         """Find the nearest node in the tree to q_rand."""
