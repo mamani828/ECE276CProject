@@ -11,7 +11,7 @@ import warnings
 import os 
 import sys
 from contextlib import contextmanager
-@contextmanager
+@contextmanager ##FROM GITHUB
 def suppress_stdout():
     fd = sys.stdout.fileno()
 
@@ -27,19 +27,13 @@ def suppress_stdout():
             yield  # allow code to be run with the redirected stdout
         finally:
             _redirect_stdout(to=old_stdout)  # restore stdout.
-            # buffering and flags such as
-            # CLOEXEC may be different
-# Ignore all warnings
+
+
 warnings.filterwarnings("ignore")
 from rrt_cbf import RRT_CBF
 from sdf import make_pybullet_env_sdf
 from envs import get_env
 from utils import mark_goal_configurations
-
-# If make_link_spheres_from_fk is defined in your existing script, import it:
-# from your_main_module import make_link_spheres_from_fk
-# Otherwise, copy its definition here.
-
 from main import make_link_spheres_from_fk
 
 def add_noise_to_obstacles(collision_ids,
@@ -103,25 +97,27 @@ def execute_path_and_check_collision(arm_id,
         # Move to next waypoint
         while True:
             # ground-truth joints
-            true_joint_positions = np.array(
-                [p.getJointState(arm_id, j)[0] for j in range(3)]
-            )
-            disp = waypoint - true_joint_positions
-            dist = np.linalg.norm(disp)
-
-            if dist < max_speed:
-                break
-
-            velocities =[0.5,0.5,0.5]
-
-            for j, v in enumerate(velocities):
-                p.setJointMotorControl2(
+            true_joint_positions = np.array([p.getJointState(arm_id, j)[0] for j in range(3)] )
+            displacement_to_waypoint = waypoint - true_joint_positions
+            if np.linalg.norm(displacement_to_waypoint) < 0.01:
+                # stop the robot
+                p.setJointMotorControlArray(
                     bodyIndex=arm_id,
-                    jointIndex=j,
+                    jointIndices=[0, 1, 2],
                     controlMode=p.VELOCITY_CONTROL,
-                    targetVelocity=v,
+                    targetVelocities=[0.0] * 3,
                 )
+                break
+            else:
+                # calculate the "velocity" to reach the next waypoint
+                velocities = displacement_to_waypoint * 0.5               
 
+                for joint_index, velocity in enumerate(velocities):
+                    p.setJointMotorControl2(
+                        bodyIndex=arm_id,
+                        jointIndex=joint_index,
+                        controlMode=p.VELOCITY_CONTROL,
+                        targetVelocity=velocity,)
             p.stepSimulation()
 
             # collision against ALL collision_ids (cubes + ground)
@@ -229,23 +225,23 @@ def run_trial(env_name, noise_std, seed, gui=True):
         q_start = goal_positions[i]
         q_goal = goal_positions[i + 1]
 
-        # rrt_planner = RRT_CBF(
-        #     q_start,
-        #     q_goal,
-        #     arm_id,
-        #     collision_ids,
-        #     joint_limits,
-        #     sdf_env,
-        #     ROBOT_SPHERES,
-        #     joint_indices=[0, 1, 2],
-        #     max_iter=10000,
-        #     step_size=0.5,
-        #     alpha=50.0,
-        #     d_safe=0.1,
-        # )
-        rrt_planner = RRT(q_start, q_goal, arm_id, collision_ids, joint_limits,
-                            max_iter=5000,
-                            step_size=0.5)
+        rrt_planner = RRT_CBF(
+            q_start,
+            q_goal,
+            arm_id,
+            collision_ids,
+            joint_limits,
+            sdf_env,
+            ROBOT_SPHERES,
+            joint_indices=[0, 1, 2],
+            max_iter=10000,
+            step_size=0.5,
+            alpha=50.0,
+            d_safe=0.1,
+        )
+        # rrt_planner = RRT(q_start, q_goal, arm_id, collision_ids, joint_limits,
+        #                     max_iter=5000,
+        #                     step_size=0.5)
         path_segment = rrt_planner.plan()
         total_nodes += len(rrt_planner.node_list)
 
@@ -318,7 +314,7 @@ def main():
             for seed in seeds:
                 print(f"Trial {len(results)+1}/{num_of_trials}: ", end="")
                 print(f"Running env={env_name}, noise_std={noise_std}, seed={seed}")
-                res = run_trial(env_name, noise_std, seed, gui=False)
+                res = run_trial(env_name, noise_std, seed, gui=True)
                 results.append(res)
 
     if not results:
