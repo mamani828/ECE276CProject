@@ -160,8 +160,8 @@ def print_table(title, rows):
 def main():
     base = os.path.dirname(os.path.abspath(__file__))
     abl_path = os.path.join(base, "ablation_results.csv")
-    rrtcbf_path = os.path.join(base, "ablation_results_dual_cbf.csv")
-    rrt_path = os.path.join(base, "ablation_results_dual.csv")
+    rrtcbf_path = os.path.join(base, "ablation_results_dual_cbf_final.csv")
+    rrt_path = os.path.join(base, "ablation_results_dual_final.csv")
 
     # Ablation summary (env, noise)
     _, abl_rows = read_csv(abl_path)
@@ -184,7 +184,7 @@ def main():
             title = "RRTCBFresults.csv summary (generic)"
             
         print_table(title, rrtcbf_summary)
-        if write_csv(os.path.join(base, "RRTCBFresults_summary.csv"), rrtcbf_summary):
+        if write_csv(os.path.join(base, "RRTCBFresults_summary_final.csv"), rrtcbf_summary):
             print("Wrote RRTCBFresults_summary.csv")
     else:
         print(f"No RRTCBFresults.csv at {rrtcbf_path}")
@@ -200,7 +200,7 @@ def main():
             title = "RRTresults.csv summary (generic)"
 
         print_table(title, rrt_summary)
-        if write_csv(os.path.join(base, "RRTresults_summary.csv"), rrt_summary):
+        if write_csv(os.path.join(base, "RRTresults_summary_final.csv"), rrt_summary):
             print("Wrote RRTresults_summary.csv")
     else:
         print(f"No RRTresults.csv at {rrt_path}")

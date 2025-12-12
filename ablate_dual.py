@@ -272,33 +272,33 @@ def run_trial(env_name, noise_std, seed, gui=False):
         q_start = goal_positions[i]
         q_goal = goal_positions[i + 1]
 
-        # rrt_planner = RRT_CBF(
-        #     q_start,
-        #     q_goal,
-        #     arm_id,
-        #     collision_ids,
-        #     joint_limits,
-        #     sdf_env,
-        #     ROBOT_SPHERES,
-        #     joint_indices=movable_joints,
-        #     ee_indices=[left_ee_idx, right_ee_idx], # Pass correct EE tips
-        #     max_iter=5000,
-        #     step_size=0.3,
-        #     alpha=50.0,
-        #     d_safe=0.05,
-        # )
-
-        rrt_planner = RRT(
+        rrt_planner = RRT_CBF(
             q_start,
             q_goal,
             arm_id,
             collision_ids,
             joint_limits,
-            movable_joints,
-            [left_ee_idx, right_ee_idx],
-            max_iter=10000,
+            sdf_env,
+            ROBOT_SPHERES,
+            joint_indices=movable_joints,
+            ee_indices=[left_ee_idx, right_ee_idx], # Pass correct EE tips
+            max_iter=5000,
             step_size=0.3,
+            alpha=50.0,
+            d_safe=0.1+noise_std*2.0,
         )
+
+        # rrt_planner = RRT(
+        #     q_start,
+        #     q_goal,
+        #     arm_id,
+        #     collision_ids,
+        #     joint_limits,
+        #     movable_joints,
+        #     [left_ee_idx, right_ee_idx],
+        #     max_iter=10000,
+        #     step_size=0.3,
+        # )
         
         path_segment = rrt_planner.plan()
         total_nodes += len(rrt_planner.node_list)
@@ -350,7 +350,7 @@ def run_trial(env_name, noise_std, seed, gui=False):
 def main():
     env_names = ["simple"]
     noise_stds = [0.0, 0.005, 0.01, 0.02]
-    seeds = [0, 1, 3, 4, 5]
+    seeds = [0, 1, 3, 6, 7]
 
     results = []
     num_of_trials = len(env_names) * len(noise_stds) * len(seeds)
