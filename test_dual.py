@@ -56,7 +56,6 @@ def mark_dual_arm_goals(
     return [m_left, m_right]
 
 
-# --- Main Execution ---
 if __name__ == "__main__":
     p.connect(p.GUI)
     p.setAdditionalSearchPath(pybullet_data.getDataPath())
@@ -64,8 +63,6 @@ if __name__ == "__main__":
 
     ground_id = p.loadURDF("plane.urdf")
 
-    # LOAD THE DUAL ARM ROBOT
-    # Assuming you saved the XML above as "dual_robot.urdf"
     robot_id = p.loadURDF(
         "dual_three_link_robot.urdf",
         [0, 0, 0],
@@ -73,14 +70,14 @@ if __name__ == "__main__":
         flags=p.URDF_USE_INERTIA_FROM_FILE,
     )
 
-    # --- 1. Identify Joint Indices Dynamically ---
+    # Identify Joint Indices Dynamically
     left_joint_names = ["baseHinge_left", "interArm_left", "interArm2_left"]
     right_joint_names = ["baseHinge_right", "interArm_right", "interArm2_right"]
 
     left_indices = [get_joint_index_by_name(robot_id, n) for n in left_joint_names]
     right_indices = [get_joint_index_by_name(robot_id, n) for n in right_joint_names]
 
-    # --- 2. Identify EE Indices ---
+    # Identify EE Indices
     ee_left_idx = get_joint_index_by_name(robot_id, "ee_joint_left")
     ee_right_idx = get_joint_index_by_name(robot_id, "ee_joint_right")
 

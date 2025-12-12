@@ -1,5 +1,6 @@
 import pybullet as p
 import numpy as np
+
 from scipy.spatial.transform import Rotation as R
 
 
@@ -28,7 +29,6 @@ def check_edge_collision(
         return check_node_collision(robot_id, object_ids, start.tolist())
 
     delta = np.abs(end - start)
-    # need maximum 50 steps to get 0.01 discretization
     steps = int(np.round(np.max(delta) / discretization_step))
     for alpha in np.linspace(0.0, 1.0, steps + 10):
         q = (start + alpha * (end - start)).tolist()
@@ -49,7 +49,7 @@ def check_node_collision(robot_id, object_ids, joint_position):
     Returns:
         bool: True if a collision is detected, False otherwise.
     """
-    # set joint positions
+    # Set joint positions
     for joint_index, joint_pos in enumerate(joint_position):
         p.resetJointState(robot_id, joint_index, joint_pos)
 
@@ -220,23 +220,21 @@ def is_state_valid(robot_id, joint_indices, q_target, obstacle_ids, check_self=T
     Returns:
         True if valid (no collisions), False otherwise.
     """
-    # 1. Save current state so we can restore it later
-    # (We don't want to mess up the simulation just to check a hypothetical state)
+    # Save current state so we can restore it later
     current_states = []
     for j_idx in joint_indices:
         current_states.append(p.getJointState(robot_id, j_idx)[0])
 
-    # 2. Teleport robot to the target configuration
+    # Teleport robot to the target configuration
     for i, j_idx in enumerate(joint_indices):
         p.resetJointState(robot_id, j_idx, q_target[i])
 
-    # 3. Step simulation "forward" by 0 seconds to update contact points
-    # (PyBullet requires this to update the AABBs for collision detection)
+    # Step simulation "forward" by 0 seconds to update contact points
     p.performCollisionDetection()
 
     is_valid = True
 
-    # 4. Check Environment Collision (Robot vs Obstacles)
+    # Check Environment Collision (Robot vs Obstacles)
     for obs_id in obstacle_ids:
         # getContactPoints returns a list. If not empty, there is a collision.
         contacts = p.getContactPoints(bodyA=robot_id, bodyB=obs_id)
@@ -245,7 +243,7 @@ def is_state_valid(robot_id, joint_indices, q_target, obstacle_ids, check_self=T
             print(f"Collision detected with obstacle ID {obs_id}")
             break
 
-    # 5. Check Self-Collision (Robot vs Robot)
+    # Check Self-Collision (Robot vs Robot)
     if is_valid and check_self:
         # getContactPoints with only bodyA checks for self-collision
         self_contacts = p.getContactPoints(bodyA=robot_id, bodyB=robot_id)
@@ -267,7 +265,7 @@ def is_state_valid(robot_id, joint_indices, q_target, obstacle_ids, check_self=T
             print(f"Self-collision detected between link {link_a} and {link_b}")
             is_valid = False
 
-    # 6. Restore original state
+    # Restore original state
     for i, j_idx in enumerate(joint_indices):
         p.resetJointState(robot_id, j_idx, current_states[i])
 
@@ -301,13 +299,12 @@ def mark_goal_configurations_dual(
     marker_ids = []
 
     for i, q_goal in enumerate(goal_configs):
-        # 1. Teleport robot to this goal configuration
+        # Teleport robot to this goal configuration
         # q_goal must be a flat list covering all movable_joints (left + right)
         for k, j_idx in enumerate(movable_joints):
             p.resetJointState(robot_id, j_idx, q_goal[k])
 
-        # 2. Get EE positions with computeForwardKinematics=True
-        # We need this because we haven't stepped the simulation
+        # Get EE positions with computeForwardKinematics=True
         state_left = p.getLinkState(
             robot_id, left_ee_idx, computeForwardKinematics=True
         )
@@ -319,7 +316,7 @@ def mark_goal_configurations_dual(
         pos_left = state_left[4]
         pos_right = state_right[4]
 
-        # 3. Create Markers
+        # Create Markers
         # Left Marker (Cyan)
         v_l = p.createVisualShape(p.GEOM_SPHERE, radius=0.05, rgbaColor=c_left)
         id_l = p.createMultiBody(baseVisualShapeIndex=v_l, basePosition=pos_left)
@@ -330,7 +327,7 @@ def mark_goal_configurations_dual(
         id_r = p.createMultiBody(baseVisualShapeIndex=v_r, basePosition=pos_right)
         marker_ids.append(id_r)
 
-        # 4. Add Labels
+        # Add Labels
         p.addUserDebugText(
             f"L{i}", [pos_left[0], pos_left[1], pos_left[2] + 0.1], c_text
         )
@@ -376,21 +373,21 @@ def mark_goal_configurations(robot_id, movable_joints, goal_configs, ee_idx):
     marker_ids = []
 
     for i, q_goal in enumerate(goal_configs):
-        # 1. Teleport robot to this goal configuration
+        # Teleport robot to this goal configuration
         for k, j_idx in enumerate(movable_joints):
             p.resetJointState(robot_id, j_idx, q_goal[k])
 
-        # 2. Get EE position with computeForwardKinematics=True
+        # Get EE position with computeForwardKinematics=True
         # We need this flag because we just teleported the joints without stepping simulation
         ee_state = p.getLinkState(robot_id, ee_idx, computeForwardKinematics=True)
         pos_ee = ee_state[4]  # Index 4 is the Link Frame position
 
-        # 3. Create Marker (Sphere)
+        # Create Marker (Sphere)
         v_ee = p.createVisualShape(p.GEOM_SPHERE, radius=0.05, rgbaColor=c_ee)
         marker_id = p.createMultiBody(baseVisualShapeIndex=v_ee, basePosition=pos_ee)
         marker_ids.append(marker_id)
 
-        # 4. Create Label (Text)
+        # Create Label (Text)
         # Shift text slightly above the sphere so it's readable
         text_pos = [pos_ee[0], pos_ee[1], pos_ee[2] + 0.1]
         p.addUserDebugText(f"Goal {i}", text_pos, c_text, textSize=1.5)
@@ -401,7 +398,6 @@ def mark_goal_configurations(robot_id, movable_joints, goal_configs, ee_idx):
     for k, j_idx in enumerate(movable_joints):
         p.resetJointState(robot_id, j_idx, current_states[k])
 
-    # Optional: Force a visual update of the robot mesh to the restored state
     p.performCollisionDetection()
 
     return marker_ids

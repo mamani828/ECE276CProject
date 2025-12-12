@@ -13,7 +13,7 @@ def get_joint_index_by_name(robot_id, name):
     return -1
 
 
-# --- Setup ---
+# Setup
 p.connect(p.GUI)
 p.setAdditionalSearchPath(pybullet_data.getDataPath())
 p.setGravity(0, 0, -9.8)
@@ -31,8 +31,6 @@ goal_positions = [
     [-1.79, 0.15, -0.15],
 ]
 
-# --- KEY FIX: Find the correct index for 'ee_joint' ---
-# Based on your URDF, this should be index 3
 ee_link_index = get_joint_index_by_name(arm_id, "ee_joint")
 print(f"Found EE Link Index: {ee_link_index}")
 
@@ -50,19 +48,19 @@ try:
         for i, q_goal in enumerate(goal_positions):
             print(f"Goal {i}: {q_goal}")
 
-            # 1. Teleport
+            # Teleport
             # Note: We only reset the first 3 joints (the revolute ones)
             # Joint 3 (ee_joint) is fixed, so we don't set it.
             for j in range(3):
                 p.resetJointState(arm_id, j, q_goal[j])
 
-            # 2. Get FK for the EE Link (Index 3)
+            # Get FK for the EE Link (Index 3)
             ee_state = p.getLinkState(
                 arm_id, ee_link_index, computeForwardKinematics=True
             )
             pos_ee = ee_state[4]  # [4] is the world link frame position
 
-            # 3. Spawn Marker
+            # Spawn Marker
             v_id = p.createVisualShape(
                 p.GEOM_SPHERE, radius=0.08, rgbaColor=[0, 1, 1, 0.6]
             )

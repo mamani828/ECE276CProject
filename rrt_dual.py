@@ -113,23 +113,23 @@ class RRT:
 
     def plan(self):
         for _ in range(self.max_iter):
-            # 1. Sample
+            # Sample
             if np.random.rand() < 0.10:
                 q_rand = self.q_goal.joint_angles.copy()
             else:
                 q_rand = np.random.uniform(self.q_limits[:, 0], self.q_limits[:, 1])
 
-            # 2. Nearest
+            # Nearest
             nearest_node = self.get_nearest_node(q_rand)
 
-            # 3. Steer
+            # Steer
             q_new = self.step(nearest_node.joint_angles, q_rand)
 
-            # 4. Check Edge Collision
+            # Check Edge Collision
             if self._check_edge_collision(nearest_node.joint_angles, q_new):
                 continue
 
-            # 5. Add Node
+            # Add Node
             new_node = Node(q_new)
             new_node.parent = nearest_node
             self.node_list.append(new_node)
@@ -137,7 +137,7 @@ class RRT:
             # Visualize
             self._visualize_edge(nearest_node.joint_angles, q_new)
 
-            # 6. Check Goal
+            # Check Goal
             if (
                 np.linalg.norm(new_node.joint_angles - self.q_goal.joint_angles)
                 <= self.step_size
@@ -157,6 +157,6 @@ class RRT:
                     while curr is not None:
                         path.append(curr.joint_angles)
                         curr = curr.parent
-                    return np.array(path[::-1])  # Reverse
+                    return np.array(path[::-1])
 
         return None
